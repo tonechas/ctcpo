@@ -1,0 +1,9 @@
+--action j
+--dataset NewBarkTex
+--descriptor ImprovedCenterSymmetricLocalBinaryPattern
+--radius 1
+--order lexicographic
+--bands RGB
+#--alpha 2
+#--cref  0,0,0
+#--seed 0 

@@ -1,0 +1,47 @@
+--action l
+#--action ef c efc j l df dc da
+
+--dataset 
+CBT
+#Drexel (*)
+#ForestMacro
+#ForestMicro
+#Kather
+#KTHTIPS2b
+#KylbergSintorn
+#MondialMarmi20
+NewBarkTex
+#Outex13
+#PapSmear
+#Parquet
+#PlantLeaves
+#RawFooT (*)
+#STex
+#VxCTSG
+
+--descriptor
+#CompletedLocalBinaryCountSM
+CompletedLocalBinaryCountSMC
+#ImprovedCenterSymmetricLocalBinaryPattern
+#LocalConcaVeMicroStructurePatterns
+#LocalConveXMicroStructurePatterns
+#LocalConcaveConvexMicroStructurePatterns
+#LocalDirectionalRankCoding
+RankTransform
+
+--order linear product lexicographic bitmixing alphamod refcolor random
+
+--radius  1  2
+#--radius  1  2  3  1,2  1,2,3
+
+--bands RGB RBG
+#--bands RGB RBG GRB GBR BRG BGR
+
+--alpha 2 4
+#--alpha  2  4  8  16  32
+
+--cref  0,0,0  127,127,127
+#--cref  0,0,0  127,127,127
+
+--seed 0 1
+#--seed 0 1 2 3 4
