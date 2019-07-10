@@ -38,6 +38,7 @@ import itertools
 import os
 import sys
 import textwrap
+import warnings
 
 import numpy as np
 
@@ -90,14 +91,14 @@ class MyArgumentParser(ArgumentParser):
         # Most of the following is copied from argparse.py
         # expand arguments referencing files
         new_arg_strings = []
-        for arg_string in arg_strings:
+        for arg_str in arg_strings:
             # for regular arguments, just add them back into the list
-            if not arg_string or arg_string[0] not in self.fromfile_prefix_chars:
-                new_arg_strings.append(arg_string)
+            if not arg_str or arg_str[0] not in self.fromfile_prefix_chars:
+                new_arg_strings.append(arg_str)
             # replace arguments referencing files with the file content
             else:
                 try:
-                    fn = arg_string[1:]
+                    fn = arg_str[1:]
                     with open(fn) as args_file:
                         # Changed this: before was []
                         arg_strings = [fn]
@@ -461,12 +462,22 @@ def grid_search_cv(X, y, clf, param_grid, n_folds, test_size, random_state):
     """
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y)
-    gscv = GridSearchCV(estimator=clf(),
-                        cv=StratifiedKFold(n_splits=n_folds, 
-                                           random_state=random_state),
-                        param_grid=param_grid,
-                        return_train_score=False)
-    gscv.fit(X_train, y_train)
+    with warnings.catch_warnings():
+        # Remove this warning:
+        # C:\Miniconda3\envs\python37\lib\site-packages\sklearn\
+        # model_selection\_search.py:813: 
+        # DeprecationWarning: The default of the `iid` parameter will 
+        # change from True to False in version 0.22 and will be removed 
+        # in 0.24. This will change numeric results when test-set 
+        # sizes are unequal.
+        # DeprecationWarning)
+        warnings.simplefilter("ignore", category=DeprecationWarning)
+        gscv = GridSearchCV(estimator=clf(),
+                            cv=StratifiedKFold(n_splits=n_folds, 
+                                               random_state=random_state),
+                            param_grid=param_grid,
+                            return_train_score=False)
+        gscv.fit(X_train, y_train)
     best_clf = clf(**gscv.best_params_)
     best_clf.fit(X_train, y_train)
     test_score = best_clf.score(X_test, y_test)
@@ -682,8 +693,8 @@ if __name__ == '__main__':
     parser = make_parser()
     if len(sys.argv) == 1:
         # No command-line arguments, intended for running the program from IDE
-        #testargs = ['@args_one.txt']
-        testargs = '--act j --dataset CBT --desc RankTransform'.split()
+        testargs = ['@args_one.txt', '--action', 'c', '--dataset', 'CBT']
+        #testargs = '--act j --dataset CBT --desc RankTransform'.split()
         fake_argv = [sys.argv[0]] + testargs
         with patch.object(sys, 'argv', fake_argv):
             args = parser.parse_args()
