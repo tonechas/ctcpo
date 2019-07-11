@@ -1,5 +1,4 @@
 #! /usr/bin/env python3
-# -*- coding: utf-8 -*-
 
 """Methods for characterizing texture images through
 Histogram of Equivalent Patterns (HEP).

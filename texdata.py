@@ -1,5 +1,4 @@
 #! /usr/bin/env python3
-# -*- coding: utf-8 -*-
 #pylint: disable=W0223
 
 """Datasets classes for texture classification."""
@@ -21,13 +20,14 @@ def find_images(dirpath):
     Returns
     -------
     imgfiles : list
-        Full path names of all the image files in folder (and its
+        Full path names of all the image files in `dirpath` (and its
         subfolders).
 
     Notes
     -----
     The complete list of image types being detected can be found at:
     https://docs.python.org/3/library/imghdr.html
+    
     """
     imgfiles = [os.path.join(root, filename)
                 for root, dirs, files in os.walk(dirpath)
@@ -46,9 +46,10 @@ class TextureDataset(object):
         Parameters
         ----------
         dirpath : string
-            Full path to the folder that contains the dataset. The name of
-            the last path component (i.e. the name of the folder that contains
-            the images) must match the class name.
+            Full path to the folder that contains the dataset. The name 
+            of the last path component (i.e. the name of the folder that 
+            contains the images) must match the class name.
+            
         """
         self.images = find_images(dirpath)
         self.classes = {text: num for num, text in enumerate(sorted(
@@ -80,6 +81,58 @@ class TextureDataset(object):
     def __str__(self):
         return self.__class__.__name__
 
+
+class NewBarkTex(TextureDataset):
+    """Class for New BarkTex dataset.
+    
+    Examples
+    --------
+    >>> import config
+    >>> nbt = NewBarkTex(os.path.join(config.imgs, 'NewBarkTex'))
+    >>> nbt.acronym
+    'NewBarkTex'
+    >>> for classname in nbt.classes.keys(): print(classname)
+    BetulaPendula
+    FagusSilvatica
+    PiceaAbies
+    PinusSilvestris
+    QuercusRobus
+    RobiniaPseudacacia
+    >>> _, imgname = os.path.split(nbt.images[0])
+    >>> imgname
+    '000000.bmp'
+    >>> len(nbt.images)
+    1632
+                
+    Notes
+    -----
+    New BarkTex is a collage of different types of tree bark derived from 
+    the BarkTex database. This dataset includes 6 classes with 68 samples 
+    per class, resulting in a total of 408 samples.
+        
+    Image format : .bmp (RGB)
+    Sample size : 64x64 px
+
+    References
+    ----------
+    .. [1] https://bit.ly/2G6WH68
+    
+    """
+
+
+    def __init__(self, dirpath):
+        super().__init__(dirpath)
+        self.acronym = 'NewBarkTex'
+
+
+    def get_class(self, img):
+        """Returns the class of the given image."""
+        path, _ = os.path.split(img)
+        _, folder = os.path.split(path)
+        return folder
+
+    
+##############################################################################
 
 class CBT(TextureDataset):
     r"""Class for Coloured Brodatz Textures dataset.
@@ -490,37 +543,6 @@ class MondialMarmi20(TextureDataset):
         return int(filename[-9:-7])
     
     
-class NewBarkTex(TextureDataset):
-    r"""Class for New BarkTex dataset.
-                
-    Notes
-    -----
-    New BarkTex is a collage of different types of tree bark derived from 
-    the BarkTex database. This dataset includes 6 classes with 68 samples 
-    per class, resulting in a total of 408 samples.
-        
-    Image format : .bmp (RGB)
-    Sample size : 64x64 px
-
-    References
-    ----------
-    .. [1] https://www-lisic.univ-littoral.fr/~porebski/BarkTex_image_test_suite.html
-    """
-
-
-    def __init__(self, dirpath):
-        super(NewBarkTex, self).__init__(dirpath)
-        self.acronym = 'NewBarkTex'
-
-
-    ## Returns the class of the img
-    def get_class(self, img):
-        """Returns the class of the given img."""
-        path, _ = os.path.split(img)
-        _, folder = os.path.split(path)
-        return folder
-
-    
 class Outex13(TextureDataset):
     """Class for the Outex13 dataset.
          
@@ -908,9 +930,10 @@ def subdivide_Parquet(source='', destination='', x=2, y=2):
 #        return head[-1]
 
 
-#if __name__ == '__main__':
-#    
-#    import platform
+if __name__ == '__main__':
+    
+    import doctest
+    doctest.testmod()
 #    from IPython.utils.path import ensure_dir_exists
 #    
 #    if platform.system() == 'Linux':

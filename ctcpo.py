@@ -181,7 +181,7 @@ def make_parser():
     parser.add_argument(
         '--jobname', 
         type=str, 
-        default='job_noname.sh',
+        default='nonamejob.sh',
         help='Name of the job (default "nonamejob")')
 
     parser.add_argument(
@@ -372,8 +372,11 @@ def extract_features(folder, datasets, descriptors):
             feat_path = utils.filepath(folder, dat_id, descr_single_id)
             print(f'Computing {dat_id}--{descr_single_id}', flush=True)
             if not os.path.isfile(feat_path):
-                X = apply_descriptor(dat, descr_single, print_info=False)
-                utils.save_object(X, feat_path)
+                try:
+                    X = apply_descriptor(dat, descr_single, print_info=False)
+                    utils.save_object(X, feat_path)
+                except MemoryError:
+                    print(f'MemoryError: skiping {dat_id}--{descr_single_id}')
     print()
 
 
@@ -530,7 +533,11 @@ def classify(folder, datasets, descriptors, estimators, test_size, n_tests,
         if os.path.isfile(result_path):
             result = utils.load_object(result_path)
         else:
-            X = get_features(folder, dat, descr)
+            try:
+                X = get_features(folder, dat, descr)
+            except MemoryError:
+                print(f'MemoryError: skiping {dat_id}--{descr_id}--{clf_id}')
+                continue
             y = dat.labels
             np.random.seed(random_state)
             random_states = np.random.randint(size=n_tests, low=0, high=1000)    
@@ -550,11 +557,94 @@ def classify(folder, datasets, descriptors, estimators, test_size, n_tests,
         print(f'Mean test score: {100*np.mean(test_scores):.2f}%\n')
 
 
-def job_script(data, loops, job_id, partition):
-    """
-    !!!
-    """
-    print('Generating job script...')
+#def command_line_arguments(folder, datasets, descriptors, estimators=None):
+#    ''' !!! Missing docstring.'''
+#    lines = []
+#
+#    for dbase, descr in itertools.product(datasets, descriptors):
+#        for (clf, _) in estimators:
+#            if not (check_features(data, dbase, descr) \
+#                    and check_results(data, dbase, descr, clf)):
+#                task = '--action all --datasets {} '.format(dbase)
+#                task += '--descriptor {} '.format(
+#                    descr.__class__.__name__)
+#                task += '--order {} '.format(descr.order)
+#                task += '--radius {} '.format(
+#                    ' '.join([str(r) for r in descr.radius]))
+#                if descr.order in ('lexicographic', 'bitmixing'):
+#                    task += '--bands {} '.format(descr.bands)
+#                elif descr.order == 'alphamod':
+#                    task += '--alpha {} '.format(descr.alpha)
+#                elif descr.order == 'refcolor':
+#                    task += '--cref {} '.format(
+#                        ' '.join([str(i) for i in descr.cref]))
+#                elif descr.order == 'random':
+#                    task += '--seed {} '.format(descr.seed)
+#                lines.append(task)
+#                break
+#    return lines
+
+
+def job_script():
+    print('Generating LaTeX...')
+#def job_script(folder, job_id, partition, datasets, descriptors, estimators=None)#data, loops):
+#    """
+#    !!!
+#    """
+#    for dat, descr in itertools.product(datasets, descriptors):
+#        dat_id = dat.acronym
+#        for rad in descr.radius:
+#            descr_single = copy.deepcopy(descr)
+#            descr_single.radius = [rad]
+#            descr_single_id = descr_single.abbrev()
+#            feat_args = [folder, dat_id, descr_single_id]
+#            if estimators is None:
+#                this_one = utils.filepath(*feat_args)
+#            else:
+#                for clf, _ in estimators:
+#                    res_args = feat_args + [clf.__name__]
+#                    this_one = utils.filepath(*res_args)
+#
+#
+#
+#    datasets, descriptors, estimators = loops
+#    utils.display_sequence(datasets, 'Datasets', symbol='-')
+#    utils.display_sequence(descriptors, 'Descriptors', symbol='-')
+#    utils.display_sequence(
+#        [est[0].__name__ for est in estimators], 'Classifiers', symbol='-')
+#
+#    utils.display_message('Creating arguments file and job script', symbol='*')
+#
+#    tasks = command_line_arguments(data, loops)
+#    count = len(tasks)
+#
+#    if count == 0:
+#        print('All tasks are already completed. Did not generate script.\n')
+#    else:
+#        args_file = 'args_{}.config'.format(job_id)
+#        save_args_file(args_file, tasks)
+#        job_file = 'job_{}.sh'.format(job_id)
+#        if partition == 'cola-corta':
+#            time_limit = '10:00:00'
+#            max_ntasks = 48
+#        elif partition == 'thinnodes':
+#            time_limit = '4-00:00:00'
+#            max_ntasks = 48
+#        elif partition == 'fatsandy':
+#            partition = 'fatsandy --qos shared'
+#            max_ntasks = 32
+#            time_limit = '4-04:00:00'
+#
+#        # Workaround to keep the number of nodes low
+#        if count > max_ntasks:
+#            count = max_ntasks
+#
+#        with open('job_template.sh', 'r') as fscript:
+#            script = fscript.read().format(
+#                jobname=job_id, partition=partition,
+#                maxtime=time_limit, ntasks=count)
+#        save_job_script(job_file, script)
+#    print('Generating job script...')
 
 
 def generate_latex(args):
@@ -590,12 +680,6 @@ def delete_files(folder, datasets, descriptors, estimators=None, both=True):
         either features or classification data are deleted (but not both).
 
     '''
-    def attempt_to_delete_file(path):
-        try:
-            os.remove(path)
-            print(f'Deleted {path}', flush=True)
-        except FileNotFoundError:
-            print(f'{path} could not be deleted', flush=True)
 
     if both:
         outcome = 'features and classification results'
@@ -616,11 +700,11 @@ def delete_files(folder, datasets, descriptors, estimators=None, both=True):
                 descr_single_id = descr_single.abbrev()
                 feat_args = [folder, dat_id, descr_single_id]
                 if both or (estimators is None):
-                     attempt_to_delete_file(utils.filepath(*feat_args))
+                     utils.attempt_to_delete_file(utils.filepath(*feat_args))
                 if both or (estimators is not None):
                     for clf, _ in estimators:
                         res_args = feat_args + [clf.__name__]
-                        attempt_to_delete_file(utils.filepath(*res_args))
+                        utils.attempt_to_delete_file(utils.filepath(*res_args))
     else:
         print(f'No {outcome} deleted\n')
     print()

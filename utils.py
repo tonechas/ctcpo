@@ -48,7 +48,8 @@ def display_sequence(seq, heading, symbol='-'):
     heading : str
         Title of the listing.
     symbol : str
-        Symbol used to print horizontal lines
+        Symbol used to print horizontal lines.
+        
     """
     length = len(heading)
     print(f'{heading}\n{symbol*length}')
@@ -125,10 +126,32 @@ def filepath(folder, *args, ext='pkl'):
         filepath('C:\\Users\\me\\texture\\data', 'PapSmear', 'ICSLBP')
     would return 
         'C:\\Users\\me\\texture\\data\\PapSmear--ICSLBP.pkl'
+    
     """
     filename = '--'.join(args) + '.' + ext
     fullpath = os.path.join(folder, filename)
     return fullpath
+
+
+def attempt_to_delete_file(path):
+    """Delete a file
+    
+    Parameters
+    ----------
+    path : str
+        Full path of the file to be deleted.
+        
+    Notes
+    -----
+    If the file does not exist, an informative message is printed.
+    
+    """
+    try:
+        os.remove(path)
+        print(f'Deleted {path}', flush=True)
+    except FileNotFoundError:
+        print(f'{path} could not be deleted', flush=True)
+
 
 def subimage(img, pixel, radius):
     """Return the subimage used to vectorize the comparison between a given
