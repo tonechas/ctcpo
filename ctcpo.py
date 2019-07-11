@@ -1,3 +1,4 @@
+#! /usr/bin/env python37
 """
 Summary
 -------
@@ -151,26 +152,19 @@ def make_parser():
     parser.add_argument(
         '--action', 
         type=str, 
-        choices = ('ef', 'extract_features', 
-                   'c', 'classify', 
-                   'efc', 'extract_features&classify', 
-                   'j', 'job', 
-                   'l', 'latex', 
-                   'df', 'delete_features', 
-                   'dr', 'delete_results', 
-                   'da', 'delete_all'), 
+        choices = ('ef', 'c', 'efc', 'j', 'l', 'df', 'dr', 'da'), 
         default='efc', 
         help=textwrap.dedent(
                 '''\
                 ACTION can be one of the following:
-                    ef    extract_features
-                    c     classify
-                    efc   extract_features&classify
-                    j     job (generate script)
-                    l     latex (generate LaTeX source code)
-                    df    delete_features
-                    dr    delete_results
-                    da    delete_all (features and results)'''))
+                    ef    Extract features
+                    c     Classify
+                    efc   Extract features and classify
+                    j     Job (generate script)
+                    l     Latex (generate LaTeX source code)
+                    df    Delete features
+                    dr    Delete results
+                    da    Delete all (features and results)'''))
 
     parser.add_argument(
         '--dataset', 
@@ -462,8 +456,13 @@ def grid_search_cv(X, y, clf, param_grid, n_folds, test_size, random_state):
     """
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=test_size, random_state=random_state, stratify=y)
+    gscv = GridSearchCV(estimator=clf(),
+                        cv=StratifiedKFold(n_splits=n_folds, 
+                                           random_state=random_state),
+                        param_grid=param_grid,
+                        return_train_score=False)
     with warnings.catch_warnings():
-        # Remove this warning:
+        # !!! Context manager intended to turn off the following warning:
         # C:\Miniconda3\envs\python37\lib\site-packages\sklearn\
         # model_selection\_search.py:813: 
         # DeprecationWarning: The default of the `iid` parameter will 
@@ -472,12 +471,8 @@ def grid_search_cv(X, y, clf, param_grid, n_folds, test_size, random_state):
         # sizes are unequal.
         # DeprecationWarning)
         warnings.simplefilter("ignore", category=DeprecationWarning)
-        gscv = GridSearchCV(estimator=clf(),
-                            cv=StratifiedKFold(n_splits=n_folds, 
-                                               random_state=random_state),
-                            param_grid=param_grid,
-                            return_train_score=False)
         gscv.fit(X_train, y_train)
+        
     best_clf = clf(**gscv.best_params_)
     best_clf.fit(X_train, y_train)
     test_score = best_clf.score(X_test, y_test)
@@ -525,8 +520,8 @@ def classify(folder, datasets, descriptors, estimators, test_size, n_tests,
     utils.boxed_text('Classifying...', symbol='*')
     print(f'Setting up the datasets, descriptors and classifiers...\n')
 
-    for items in itertools.product(datasets, descriptors, estimators):
-        dat, descr, (clf, param_grid) = items
+    for items in itertools.product(estimators, datasets, descriptors):
+        (clf, param_grid), dat, descr = items
         dat_id = dat.acronym
         descr_id = descr.abbrev()
         clf_id = clf.__name__
@@ -693,7 +688,7 @@ if __name__ == '__main__':
     parser = make_parser()
     if len(sys.argv) == 1:
         # No command-line arguments, intended for running the program from IDE
-        testargs = ['@args_one.txt', '--action', 'c', '--dataset', 'CBT']
+        testargs = ['@args_one.txt', '--action', 'efc']
         #testargs = '--act j --dataset CBT --desc RankTransform'.split()
         fake_argv = [sys.argv[0]] + testargs
         with patch.object(sys, 'argv', fake_argv):
@@ -725,13 +720,13 @@ if __name__ == '__main__':
     
     # Execute the proper action
     option = args.action.lower()
-    if option in ('ef', 'extract_features'):
+    if option == 'ef':
         extract_features(config.data, datasets, descriptors)
-    elif option in ('c', 'classify'):
+    elif option == 'c':
         classify(config.data, datasets, descriptors, 
                  config.estimators, config.test_size, 
                  config.n_tests, config.n_folds, config.random_state)
-    elif option in ('efc', 'extract_features&classify'):
+    elif option == 'efc':
         extract_features(config.data, datasets, descriptors)
         # The generators are now exhausted and need to be refreshed
         datasets = gen_datasets(config.imgs, args.dataset)
@@ -739,16 +734,16 @@ if __name__ == '__main__':
         classify(config.data, datasets, descriptors, 
                  config.estimators, config.test_size, 
                  config.n_tests, config.n_folds, config.random_state)
-    elif option in ('j', 'job'):
+    elif option == 'j':
         job_script(config.data, None, args.jobname, args.partition)
-    elif option in ('l', 'latex'):
+    elif option == 'l':
         generate_latex(args)
-    elif option in ('df', 'delete_features'):
+    elif option == 'df':
         delete_files(config.data, datasets, descriptors, both=False)
-    elif option in ('dr', 'delete_results'):
+    elif option == 'dr':
         delete_files(config.data, datasets, descriptors, 
                      config.estimators, both=False)
-    elif option in ('da', 'delete_all'):
+    elif option == 'da':
         delete_files(config.data, datasets, descriptors, 
                      config.estimators, both=True)
     else:

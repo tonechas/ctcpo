@@ -26,6 +26,7 @@ This module defines the following global variables:
 
 import os
 import platform
+import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
 
@@ -43,8 +44,7 @@ log = os.path.join(home, 'log')
 
 estimators = [
     (KNeighborsClassifier, dict(n_neighbors=[1, 3, 5, 7, 9, 11])),
-    (SVC, dict(C=[2**i for i in range(-5, 16, 2)],
-               gamma=[2**j for j in range(-15, 4, 2)])),
+    (SVC, dict(C=np.logspace(-3, 2, 6), gamma=np.logspace(-3, 2, 6))),
     ]
 
 n_tests = 5
