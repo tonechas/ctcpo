@@ -61,13 +61,13 @@ def histogram(codes, nbins):
     return h_norm
 
 #vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv#
-_orders = ('linear',
-           'product',
-           'lexicographic',
-           'alphamod',
-           'bitmixing',
-           'refcolor',
-           'random')
+#_orders = ('linear',
+#           'product',
+#           'lexicographic',
+#           'alphamod',
+#           'bitmixing',
+#           'refcolor',
+#           'random')
 
 
 #def lexicographic_order(neighbour, central, bandperm=(0, 1, 2), comp=np.less):
@@ -331,9 +331,6 @@ class HEP(object):
             Feature vector (histogram of equivalent patterns).
             
         """
-        # Remove the transparency layer if necessary
-        if img.ndim == 3 and img.shape[2] == 4:
-            img = img[:, :, :3]
         if len(self.radius) == 1:
             # Single scale
             codes = self.codemap(img, self.radius[0], self.points[0])
@@ -1166,9 +1163,8 @@ class LocalDirectionalRankCoding(HEP):
     .. [1] Farida Ouslimani, Achour Ouslimani and Zohra Ameur
            Directional Rank Coding For Multi-scale Texture Classification
            https://hal.archives-ouvertes.fr/hal-01368416
+           
     """
-
-
     def compute_dims(self, points):
         """Compute the dimension of the histogram for each neighbourhood."""
         if self.order in ('linear', 'lexicographic', 'alphamod',
@@ -1177,9 +1173,7 @@ class LocalDirectionalRankCoding(HEP):
         elif self.order == 'product':
             return [4**(p//2) for p in self.points]
         else:
-            msg = '''{} order is not supported for {} descriptor'''.format(
-                self.order, self.__class__.__name__)
-            raise ValueError(msg)
+            self.print_order_not_supported()
 
 
     def codemap(self, img, radius, points):
@@ -1200,22 +1194,46 @@ class LocalDirectionalRankCoding(HEP):
         codes : array
             Map of feature values.
 
+        Examples
+        --------
+        >>> d_lin = LocalDirectionalRankCoding(order='linear', radius=[1])
+        >>> d_lin.dims
+        [81]
+        >>> gray = np.array([[25, 33, 10],
+        ...                  [53, 25, 75],
+        ...                  [15, 17, 12]])
+        ...
+        >>> d_lin.codemap(gray, radius=1, points=8)
+        array([[42]])
+        >>> d_prod = LocalDirectionalRankCoding(order='product', radius=[1])
+        >>> d_prod.dims
+        [256]
+        >>> rgb = np.array([[[102, 220, 225],
+        ...                  [ 95, 179,  61],
+        ...                  [234, 203,  92]],
+        ...                 [[  3,  98, 243],
+        ...                  [ 14, 149, 245],
+        ...                  [ 46, 186, 250]],
+        ...                 [[ 99, 187,  71],
+        ...                  [212, 153, 199],
+        ...                  [188, 174,  65]]])
+        ...
+        >>> d_prod.codemap(rgb, radius=1, points=8)
+        array([[253]])
+        
         """
         central = img[radius: -radius, radius: -radius]
         codes = np.zeros(shape=central.shape[:2], dtype=np.int_)
 
         for exponent, index in enumerate(range(points//2)):
-
             rank = np.zeros_like(codes)
-
             less = np.zeros_like(codes)
+
             if self.order == 'product':
                 greq = np.zeros_like(codes)
 
             for pixel in [index, index + points//2]:
-
                 neighbour = utils.subimage(img, pixel, radius)
-
                 less += self.compare(neighbour, central, np.less)
 
                 if self.order == 'product':
@@ -1249,10 +1267,15 @@ class RankTransform(HEP):
     >>> rt_lin = RankTransform(order='linear', radius=[1, 2, 3])
     >>> rt_lin.dims
     [9, 17, 25]
+    >>> gray = np.array([[25, 33, 80],
+    ...                  [53, 25, 75],
+    ...                  [15, 17, 12]])
+    ...
+    >>> rt_lin.codemap(gray, 1, 8)
+    array([[3]])
     >>> rt_prod = RankTransform(order='product', radius=[1, 2, 3])
     >>> rt_prod.dims
     [45, 153, 325]
-    >>> rt_lex = RankTransform(order='lexicographic', radius=[1, 2, 3])
     
     """
     def compute_dims(self, points):

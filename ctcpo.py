@@ -335,6 +335,9 @@ def apply_descriptor(dataset, descriptor, print_info=False):
         if print_info:
             print(image_path, flush=True)
         img = io.imread(image_path)
+        # Remove the transparency layer if necessary
+        if img.ndim == 3 and img.shape[2] == 4:
+            img = img[:, :, :3]
         # Check that img has the correct type
         if order == 'linear' and img.ndim > 2:
             img = color.rgb2gray(img)
@@ -594,7 +597,21 @@ def classify(folder, datasets, descriptors, estimators, test_size, n_tests,
 
 
 def job_script():
-    print('Generating LaTeX...')
+    print('Generating jo script...\n')
+    import psutil
+    for dat, descr in itertools.product(datasets, descriptors):
+        dat_id = dat.acronym
+        for rad in descr.radius:
+            descr_single = copy.deepcopy(descr)
+            descr_single.radius = [rad]
+            descr_single_id = descr_single.abbrev()
+            print(f'Computing {dat_id}--{descr_single_id}', flush=True)
+            try:
+                print(f'{psutil.virtual_memory()[3]/(1024**2):.1f}', flush=True)
+            except MemoryError:
+                print(f'MemoryError: skipping {dat_id}--{descr_single_id}', flush=True)
+    print()
+    
 #def job_script(folder, job_id, partition, datasets, descriptors, estimators=None)#data, loops):
 #    """
 #    !!!
@@ -827,7 +844,7 @@ if __name__ == '__main__':
                  config.estimators, config.test_size, 
                  config.n_tests, config.n_folds, config.random_state)
     elif option == 'j':
-        job_script(config.data, None, args.jobname, args.partition)
+        job_script()
     elif option == 'l':
         generate_latex(args)
     elif option == 'df':
