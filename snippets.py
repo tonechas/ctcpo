@@ -444,3 +444,18 @@ def load_settings(filename):
         settings = load_settings(args['argsfile'])
         args = {**args, **settings}
 
+
+
+#########################################################################
+# hep.py
+
+d = CompletedLocalBinaryCountSM(order='alphamod', radius=[1])
+img = np.random.randint(low=0, high=256, size=(5, 7, 3), dtype=np.uint8)
+d = LocalConcaveConvexMicroStructurePatterns(order='bitmixing')
+#img = np.uint8(np.arange(12).reshape((3, 4)))
+#img = np.array([[0, 1, 2, 3], [4, 5.3, 6.9, 7], [8, 9, 10, 11]])
+img = np.arange(4*5*3).reshape((4,5,3))
+h = d(img)
+print(np.nonzero(h))
+np.random.seed(0)
+z = np.random.permutation(256)

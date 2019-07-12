@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+#! /usr/bin/env python37
 
 """Methods for characterizing texture images through
 Histogram of Equivalent Patterns (HEP).
@@ -6,18 +6,8 @@ Histogram of Equivalent Patterns (HEP).
 
 
 import numpy as np
-from skimage import color
 
 import utils
-
-
-_orders = ('linear',
-           'product',
-           'lexicographic',
-           'alphamod',
-           'bitmixing',
-           'refcolor',
-           'random')
 
 
 def square_frame_size(radius):
@@ -41,15 +31,10 @@ def square_frame_size(radius):
     [24]
     >>> square_frame_size([1, 2, 3])
     [8, 16, 24]
+
     """
     points = [8*r for r in radius]
     return points
-
-
-def convert_gray(img):
-    """Convert to grayscale if `img` is a color image."""
-    gray = (color.rgb2gray(img) if img.ndim > 2 else img)
-    return gray
 
 
 def histogram(codes, nbins):
@@ -59,7 +44,7 @@ def histogram(codes, nbins):
     ----------
     codes : array, dtype=int
         Array of feature values.
-        For LCCMSP codes is a multidimensional array. It has two layers,
+        For LCCMSP `codes` is a multidimensional array. It has two layers,
         one for the concave patterns and another for the convex patterns.
     nbins : int
         Number of bins of the computed histogram, i.e. number of
@@ -69,10 +54,20 @@ def histogram(codes, nbins):
     -------
     h_norm : array
         Normalized histogram.
+
     """
     hist = np.bincount(codes.ravel(), minlength=nbins)
     h_norm = hist/hist.sum()
     return h_norm
+
+#vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv#
+_orders = ('linear',
+           'product',
+           'lexicographic',
+           'alphamod',
+           'bitmixing',
+           'refcolor',
+           'random')
 
 
 #def lexicographic_order(neighbour, central, bandperm=(0, 1, 2), comp=np.less):
@@ -182,13 +177,14 @@ def histogram(codes, nbins):
 #    result =  comp(dist_neighbour, dist_central)
 #    return result
 
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^#
 
 class HEP(object):
     """Superclass for histogram of equivalent patterns descriptors.
 
     Notes
     -----
-    `order='bitxing'`
+    `order='bitmixing'`
     In this case the triplet of unsigned integers
     [r7r6...r0, g7g6...g0, b7b6...1b0] is converted into an unsigned integer
     r7g7b7r6g6b6...r0g0b0 which is used as the ordering criterion.
@@ -220,6 +216,7 @@ class HEP(object):
     .. [1] A. Fernandez, M. X. Alvarez, and F. Bianconi
            Texture Description through Histograms of Equivalent Patterns
            http://dx.doi.org/10.1007/s10851-012-0349-8
+
     """
     def __init__(self, **kwargs):
         """Initializer of a HEP instance.
@@ -241,8 +238,8 @@ class HEP(object):
                     Lexicographic order with the first component
                     divided by alpha.
                 'bitmixing':
-                    Lexicographic order based on priorities between the
-                    chromatic components.
+                    Lexicographic order based on binary representation 
+                    of intensities.
                 'refcolor':
                     Preorder that relies on the Euclidean distance between
                     a color and a reference color.
@@ -255,8 +252,9 @@ class HEP(object):
             Color band priorities.
         cref : list of int, default is [0, 0, 0]
             RGB coordinates of the reference color.
-        seed : int
+        seed : int, default is 0
             Seed for the pseudo-random number generator.
+
         """
         self.radius = kwargs.get('radius', [1])
         self.order = kwargs.get('order', 'linear')
@@ -281,7 +279,7 @@ class HEP(object):
             exponents = [channels*np.arange(bits)[::-1] + ind
                          for ind in range(channels)[::-1]]
 
-            weights = [np.long(2)**exp for exp in exponents]
+            weights = [2**exp for exp in exponents]
 
             red = np.sum(np.unpackbits(indices, axis=-1)*weights[0], axis=-1)
             green = np.sum(np.unpackbits(indices, axis=-1)*weights[1], axis=-1)
@@ -302,8 +300,6 @@ class HEP(object):
         if self.order == 'refcolor':
             self.cref = kwargs.get('cref', [0, 0, 0])
 
-        self.acronym = self.set_acronym()
-
 
     def compute_dims(self, points):
         """Compute the dimension of the histogram for each neighbourhood."""
@@ -314,6 +310,12 @@ class HEP(object):
         """Return a map of feature values."""
         raise NotImplementedError("Subclasses should implement this!")
 
+
+    def print_order_not_supported(self):
+        order = self.order
+        classname = self.__class__.__name__
+        msg = f'{order} order is not supported for {classname} descriptor'
+        raise ValueError(msg)
 
     def __call__(self, img):
         """Compute the feature vector of an image through a HEP descriptor.
@@ -327,6 +329,7 @@ class HEP(object):
         -------
         hist : array
             Feature vector (histogram of equivalent patterns).
+            
         """
         # Remove the transparency layer if necessary
         if img.ndim == 3 and img.shape[2] == 4:
@@ -372,22 +375,23 @@ class HEP(object):
         Returns
         -------
         out : str
-            Abbreviated name of the descriptor which is used in the file names 
-            where the corresponding data (features or/and classification results) 
-            are saved.
+            Abbreviated name of the descriptor which is used to generate 
+            the names of the files where the corresponding data (features 
+            or/and classification results) are saved.
             
         Examples
         --------
         >>> RankTransform(order='linear', radius=[1]).abbrev()
         'RT[1]'
-        >>> RankTransform(order='product', radius=[1, 2]).abbrev())
+        >>> RankTransform(order='product', radius=[1, 2]).abbrev()
         'RTprod[1,2]'
-        >>> CompletedLocalBinaryCountSM(order='bitmixing', bands='GRB', \
-radius=[1, 2, 3]).abbrev())
+        >>> params1 = dict(order='bitmixing', bands='GRB', radius=[1, 2, 3])
+        >>> CompletedLocalBinaryCountSM(**params1).abbrev()
         'CLBCSMmixGRB[1,2,3]'
-        >>> ImprovedCenterSymmetricLocalBinaryPattern(radius=[1], alpha=2, \
-order='alphamod', bands='BRG').abbrev()
+        >>> params2 = dict(radius=[1], alpha=2, order='alphamod', bands='BRG')
+        >>> ImprovedCenterSymmetricLocalBinaryPattern(**params2).abbrev()
         'ICSLBPalpha2BRG[1]'
+        
         """
         name = self.__class__.__name__
     
@@ -424,79 +428,6 @@ order='alphamod', bands='BRG').abbrev()
         return out.replace(' ', '')
 
 
-    def short_name(self):
-        """Return the abbreviated descriptor name."""
-        short_descr = ''.join([letter for letter in self.__class__.__name__ 
-                               if letter.isupper()])
-        order = self.order
-        if order == 'linear':
-            short_order = ''
-        elif order == 'product':
-            short_order = 'prod'
-        elif order == 'lexicographic':
-            short_order = 'lex'
-        elif order == 'alphamod':
-            short_order = 'alpha'
-        elif order == 'bitmixing':
-            short_order = 'mix'
-        elif order == 'refcolor':
-            short_order = 'ref'
-        elif order == 'random':
-            short_order = 'rand'
-
-
-        if self.order in ('lexicographic', 'bitmixing'):
-            suffix = self.bands
-        elif self.order == 'alphamod':
-            suffix = self.alpha
-        elif self.order == 'refcolor':
-            suffix = ''.join([format(i, '02x') for i in self.cref]).upper()
-        elif self.order == 'random':
-            suffix = self.seed
-        else:
-            suffix = ''
-        out = f'{short_descr}{short_order}{suffix}{self.radius}'
-        return out.replace(' ', ',')
-
-
-    def set_acronym(self):
-        """ Define the abbreviated descriptor name.
-        !!!"""
-        descr_acronym = ''.join([letter for letter in self.__class__.__name__
-                                 if letter.isupper()])
-        if self.order == 'linear':
-            order_acronym = ''
-        elif self.order == 'product':
-            order_acronym = 'prod'
-        elif self.order == 'lexicographic':
-            order_acronym = 'lex'
-        elif self.order == 'alphamod':
-            order_acronym = 'alpha'
-        elif self.order == 'bitmixing':
-            order_acronym = 'mix'
-        elif self.order == 'refcolor':
-            order_acronym = 'ref'
-        elif self.order == 'random':
-            order_acronym = 'rand'
-
-        out = f'{descr_acronym}{order_acronym}'
-
-        if self.order in ('lexicographic', 'bitmixing'):
-            out += '{}'.format(self.bands)
-
-        if self.order == 'alphamod':
-            out += '{}'.format(self.alpha)
-
-        if self.order == 'refcolor':
-            out += ''.join([format(i, '02x') for i in self.cref]).upper()
-
-        if self.order == 'random':
-            out += '{}'.format(self.seed)
-
-        out += '{}'.format(self.radius)
-        return out.replace(' ', '')
-
-
     def get_single_scale(self, radius):
         """Create a single scale instance of the descriptor.
 
@@ -510,6 +441,7 @@ order='alphamod', bands='BRG').abbrev()
         descr : `HEP`
             Instance with the same attributes as `self` except `radius`,
             which contains a single scale.
+            
         """
         params = {k: v for k, v in self.__dict__.items()}
         params['radius'] = [radius]
@@ -569,6 +501,7 @@ order='alphamod', bands='BRG').abbrev()
         >>> np.testing.assert_array_equal(d_lexrgb.compare(b1, b2),
         ...                               [[ True, False],
         ...                                [ True,  True]])
+        ...
         >>> d_lexbgr = RankTransform(order='lexicographic', bands='BGR')
         >>> np.testing.assert_array_equal(d_lexbgr.compare(b1, b2, np.greater),
         ...                               [[ True, False],
@@ -586,16 +519,16 @@ order='alphamod', bands='BRG').abbrev()
         >>> d_mixrgb.compare(c1, c2, np.less)
         array([[ True],
                [False],
-               [False]], dtype=bool)
+               [False]])
         >>> d_mixrgb.compare(c1, c2, np.greater_equal)
         array([[False],
                [ True],
-               [ True]], dtype=bool)
+               [ True]])
         >>> d_mixbgr = RankTransform(order='bitmixing', bands='BGR')
         >>> d_mixbgr.compare(c1, c2, np.less)
         array([[ True],
                [False],
-               [False]], dtype=bool)
+               [False]])
         >>> z1 = np.asarray([[[0, 0, 1], [0, 3, 4]],
         ...                  [[3, 4, 0], [1, 1, 1]]])
         ...
@@ -605,29 +538,28 @@ order='alphamod', bands='BRG').abbrev()
         >>> d_ref0 = RankTransform(order='refcolor', cref=[0, 0, 0])
         >>> d_ref0.compare(z1, z2, np.less)
         array([[False, False],
-               [False,  True]], dtype=bool)
+               [False,  True]])
         >>> d_ref0.compare(z1, z2, np.greater_equal)
         array([[ True,  True],
-               [ True, False]], dtype=bool)
+               [ True, False]])
         >>> d_ref9 = RankTransform(order='refcolor', cref=[9, 9, 9])
         >>> d_ref9.compare(z1, z2, np.less)
         array([[False,  True],
-               [ True,  True]], dtype=bool)
+               [ True,  True]])
         >>> d_ref9.compare(z1, z2, np.greater_equal)
         array([[ True, False],
-               [False, False]], dtype=bool)
+               [False, False]])
         >>> d_alpha4 = RankTransform(order='alphamod', alpha=4)
         >>> y1 = np.asarray([[[20, 10, 13], [43, 90, 51]],
-                             [[55, 20, 60], [56, 20, 60]]])
+        ...                  [[55, 20, 60], [56, 20, 60]]])
         ...
         >>> y2 = np.asarray([[[21, 10, 13], [42, 90, 50]],
-                             [[53, 20, 60], [53, 20, 60]]])
+        ...                  [[53, 20, 60], [53, 20, 60]]])
         ...
-        >>> y2 = np.asarray([[[0, 0, 1], [5, 0, 0]],
-        ...                  [[1, 1, 1], [0, 3, 0]]])
         >>> d_alpha4.compare(y1, y2, comp=np.less_equal)
         array([[ True, False],
-               [ True, False]], dtype=bool)
+               [ True, False]])
+
         """
         if self.order == 'linear':
             result = comp(xarr, yarr)
@@ -723,19 +655,8 @@ class CompletedLocalBinaryCountSM(HEP):
         codes : array
             Map of feature values.
         """
-        # !!! Have to fix this
-        if self.order in ('bitmixing', 'refcolor') and img.dtype != np.uint8:
-            msg = '''Exception in {}.codemap()
-                     Image type has to be numpy.uint8'''.format(self.acronym)
-            raise TypeError(msg)
-
-        if self.order == 'linear':
-            img = convert_gray(img)
-
         central = img[radius: -radius, radius: -radius]
-
         codes_s = np.zeros(shape=central.shape[:2], dtype=np.int_)
-
         lt_s = np.zeros_like(codes_s)
 
         if self.order == 'product':
@@ -855,15 +776,6 @@ class CompletedLocalBinaryCountSMC(HEP):
         codes : array
             Map of feature values.
         """
-        # !!! Have to fix this
-        if self.order in ('bitmixing', 'refcolor') and img.dtype != np.uint8:
-            msg = '''Exception in {}.codemap()
-                     Image type has to be numpy.uint8'''.format(self.acronym)
-            raise TypeError(msg)
-
-        if self.order == 'linear':
-            img = convert_gray(img)
-
         central = img[radius: -radius, radius: -radius]
 
         codes_s = np.zeros(shape=central.shape[:2], dtype=np.int_)
@@ -1003,15 +915,6 @@ class ImprovedCenterSymmetricLocalBinaryPattern(HEP):
         codes : array
             Map of feature values.
         """
-        # !!! Have to fix this
-        if self.order in ('bitmixing', 'refcolor') and img.dtype != np.uint8:
-            msg = '''Exception in {}.codemap().
-                     Image type has to be numpy.uint8'''.format(self.acronym)
-            raise TypeError(msg)
-
-        if self.order == 'linear':
-            img = convert_gray(img)
-
         central = img[radius: -radius, radius: -radius]
         codes = np.zeros(shape=central.shape[:2], dtype=np.int_)
 
@@ -1066,9 +969,6 @@ class LocalConcaVeMicroStructurePatterns(HEP):
         codes : array
             Map of feature values.
         """
-        if self.order == 'linear':
-            img = convert_gray(img)
-
         central = img[radius: -radius, radius: -radius]
         codes = np.zeros(shape=central.shape[:2], dtype=np.int_)
 
@@ -1120,9 +1020,6 @@ class LocalConveXMicroStructurePatterns(HEP):
         codes : array
             Map of feature values.
         """
-        if self.order == 'linear':
-            img = convert_gray(img)
-
         central = img[radius: -radius, radius: -radius]
         codes = np.zeros(shape=central.shape[:2], dtype=np.int_)
 
@@ -1175,9 +1072,6 @@ class LocalConcaveConvexMicroStructurePatterns(HEP):
             Map of feature values.
         """
         step = 2
-
-        if self.order == 'linear':
-            img = convert_gray(img)
 
         central = img[radius: -radius, radius: -radius]
 
@@ -1305,16 +1199,8 @@ class LocalDirectionalRankCoding(HEP):
         -------
         codes : array
             Map of feature values.
+
         """
-        # !!! Have to fix this
-        if self.order in ('bitmixing', 'refcolor') and img.dtype != np.uint8:
-            msg = '''Exception in {}.codemap()
-                     Image type has to be numpy.uint8'''.format(self.acronym)
-            raise TypeError(msg)
-
-        if self.order == 'linear':
-            img = convert_gray(img)
-
         central = img[radius: -radius, radius: -radius]
         codes = np.zeros(shape=central.shape[:2], dtype=np.int_)
 
@@ -1357,6 +1243,17 @@ class RankTransform(HEP):
            Compact color texture descriptor based on rank transform and
            product ordering in the RGB color space
            https://doi.org/10.1109/ICCVW.2017.126
+           
+    Examples
+    --------
+    >>> rt_lin = RankTransform(order='linear', radius=[1, 2, 3])
+    >>> rt_lin.dims
+    [9, 17, 25]
+    >>> rt_prod = RankTransform(order='product', radius=[1, 2, 3])
+    >>> rt_prod.dims
+    [45, 153, 325]
+    >>> rt_lex = RankTransform(order='lexicographic', radius=[1, 2, 3])
+    
     """
     def compute_dims(self, points):
         """Compute the dimension of the histogram for each neighbourhood."""
@@ -1366,9 +1263,7 @@ class RankTransform(HEP):
         elif self.order == 'product':
             return [(p + 2)*(p + 1)//2 for p in self.points]
         else:
-            msg = '''{} order is not supported for {} descriptor'''.format(
-                self.order, self.__class__.__name__)
-            raise ValueError(msg)
+            self.print_order_not_supported()
 
 
     def codemap(self, img, radius, points):
@@ -1388,27 +1283,16 @@ class RankTransform(HEP):
         -------
         codes : array
             Map of feature values.
+            
         """
-        # !!! Have to fix this
-        if self.order in ('bitmixing', 'refcolor') and img.dtype != np.uint8:
-            msg = '''Exception in {}.codemap()
-                     Image type has to be numpy.uint8'''.format(self.acronym)
-            raise TypeError(msg)
-
-        if self.order == 'linear':
-            img = convert_gray(img)
-
         central = img[radius: -radius, radius: -radius]
-        codes = np.zeros(shape=central.shape[:2], dtype=np.int_)
-
-        less = np.zeros_like(codes)
+        less = np.zeros(shape=central.shape[:2], dtype=np.int_)
 
         if self.order == 'product':
-            greq = np.zeros_like(codes)
+            greq = np.zeros_like(less)
 
         for pixel in range(points):
             neighbour = utils.subimage(img, pixel, radius)
-
             less += self.compare(neighbour, central, comp=np.less)
 
             if self.order == 'product':
@@ -1424,22 +1308,7 @@ class RankTransform(HEP):
         return codes
 
 
-if __name__ == '__main__':
-    
+if __name__ == '__main__':   
     # Run tests
     import doctest
     doctest.testmod()
-
-
-
-
-#    d = CompletedLocalBinaryCountSM(order='alphamod', radius=[1])
-#    img = np.random.randint(low=0, high=256, size=(5, 7, 3), dtype=np.uint8)
-#    d = LocalConcaveConvexMicroStructurePatterns(order='bitmixing')
-#    #img = np.uint8(np.arange(12).reshape((3, 4)))
-#    #img = np.array([[0, 1, 2, 3], [4, 5.3, 6.9, 7], [8, 9, 10, 11]])
-#    img = np.arange(4*5*3).reshape((4,5,3))
-#    h = d(img)
-#    print(np.nonzero(h))
-#    np.random.seed(0)
-#    z = np.random.permutation(256)

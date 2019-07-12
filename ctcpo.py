@@ -44,7 +44,7 @@ import warnings
 import numpy as np
 
 from argparse import ArgumentParser, RawTextHelpFormatter
-from skimage import io
+from skimage import io, color
 from sklearn.model_selection import GridSearchCV
 from sklearn.neighbors import KNeighborsClassifier
 from unittest.mock import patch
@@ -328,11 +328,19 @@ def apply_descriptor(dataset, descriptor, print_info=False):
         of the feature space.
         
     """
+    need_uint8 = ('bitmixing', 'refcolor')
+    order = descriptor.order
     X = np.zeros(shape=(len(dataset.images), descriptor.dim), dtype=np.float64)
     for i, image_path in enumerate(dataset.images):
         if print_info:
             print(image_path, flush=True)
         img = io.imread(image_path)
+        # Check that img has the correct type
+        if order == 'linear' and img.ndim > 2:
+            img = color.rgb2gray(img)
+        if order in need_uint8 and img.dtype != np.uint8:
+            raise TypeError(f'Cannot compute {descriptor.abbrev()}.codemap() '
+                            f'{image_path} has to be numpy.uint8')        
         X[i] = descriptor(img)
     return X
 
@@ -376,7 +384,7 @@ def extract_features(folder, datasets, descriptors):
                     X = apply_descriptor(dat, descr_single, print_info=False)
                     utils.save_object(X, feat_path)
                 except MemoryError:
-                    print(f'MemoryError: skiping {dat_id}--{descr_single_id}')
+                    print(f'MemoryError: skipping {dat_id}--{descr_single_id}')
     print()
 
 
@@ -536,7 +544,7 @@ def classify(folder, datasets, descriptors, estimators, test_size, n_tests,
             try:
                 X = get_features(folder, dat, descr)
             except MemoryError:
-                print(f'MemoryError: skiping {dat_id}--{descr_id}--{clf_id}')
+                print(f'MemoryError: skipping {dat_id}--{descr_id}--{clf_id}')
                 continue
             y = dat.labels
             np.random.seed(random_state)
