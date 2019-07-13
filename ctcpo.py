@@ -403,14 +403,16 @@ def extract_features(data_folder, imgs_folder, args):
                 descr_rad = copy.deepcopy(descr)
                 descr_rad.radius = [rad]
                 descr_rad_id = descr_rad.abbrev()
-                feat_path = utils.filepath(data_folder, dat_id, descr_rad_id)
+#                feat_path = utils.filepath(data_folder, dat_id, descr_rad_id)
+                feat_path = utils.filepath(data_folder, dat_id, descr_rad_id, ext='npy')
                 if os.path.isfile(feat_path):
                     print(f'Found {dat_id}--{descr_rad_id}', flush=True)
                 else:
                     print(f'Computing {dat_id}--{descr_rad_id}', flush=True)
                     X = apply_descriptor(dat, descr_rad)
                     if X is not None:
-                        utils.save_object(X, feat_path)
+#                        utils.save_object(X, feat_path)
+                        np.save(feat_path, X)
     print()
 
 

@@ -3,6 +3,7 @@
 """
 import bz2
 import os
+import traceback
 
 import _pickle as pickle
 
@@ -72,10 +73,13 @@ def load_object(path):
     obj : any type
         Object loaded from disk.
     """
-    with bz2.BZ2File(path, 'rb') as fid:
-#    with open(path, 'rb') as fid:
-        obj = pickle.load(fid)
-    return obj
+    try:
+        with bz2.BZ2File(path, 'rb') as fid:
+        #with open(path, 'rb') as fid:
+            obj = pickle.load(fid)
+        return obj
+    except Exception as error:
+        traceback.print_exc()
 
 
 def save_object(obj, path):
@@ -88,9 +92,12 @@ def save_object(obj, path):
     path : str
         Full path of the file where the object will be stored.
     """
-    with bz2.BZ2File(path, 'wb') as fid:
-#    with open(path, 'wb') as fid:
-        pickle.dump(obj, fid, protocol=2)
+    try:
+        with bz2.BZ2File(path, 'wb') as fid:
+        #with open(path, 'wb') as fid:
+            pickle.dump(obj, fid, protocol=2)
+    except Exception as error:
+        traceback.print_exc()
 
 
 def filepath(folder, *args, ext='pkl'):

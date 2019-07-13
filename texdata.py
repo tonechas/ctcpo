@@ -361,6 +361,63 @@ class PapSmear(TextureDataset):
             return folder.split('--')[-1]
 
 
+class PlantLeaves(TextureDataset):
+    """Class for PlantLeaves dataset.
+                
+    Notes
+    -----
+    PlantLeaves consists of 1200 images of leaves of 20 plant species 
+    (20 classes x 20 leaves/class x 3 samples/leave). Class labels go 
+    from 'c01' through 'c20'.
+        
+    Image format : .png (RGB)
+    Sample size : 128x128 px
+                
+    Sample file name : c017/c01_011_a_w03.png
+        class : c01
+        leave : 011
+        sample : 03
+
+    Examples
+    --------
+    >>> import config
+    >>> pl = PlantLeaves(os.path.join(config.imgs, 'PlantLeaves'))
+    >>> pl.acronym
+    'Plant'
+    >>> len(pl.classes)
+    20
+    >>> len(pl.images)
+    1200
+    >>> n = 50
+    >>> head, imgname = os.path.split(pl.images[n])
+    >>> imgname
+    'c01_017_a_w03.png'
+    >>> _, foldername = os.path.split(head)
+    >>> foldername
+    'c01'
+    >>> pl.get_class(pl.images[n])
+    'c01'
+    
+    References
+    ----------
+    .. [1] Plant Leaf Identification Using Gabor Wavelets
+           Dalcimar Casanova, Jarbas Joaci de Mesquita Sá Junior, Odemir 
+           Martinez Bruno
+           https://doi.org/10.1002/ima.20201
+
+    """
+    def __init__(self, dirpath):
+        super().__init__(dirpath)
+        self.acronym = 'Plant'
+
+
+    def get_class(self, img):
+        """Returns the class of the given img."""
+        location, _ = os.path.split(img)
+        _, folder = os.path.split(location)
+        return folder
+
+
 ##############################################################################
 
 #class Drexel(TextureDataset):
@@ -721,45 +778,6 @@ class Parquet(TextureDataset):
         
     def get_class(self, img):
         """Extract the class label from the given image file name."""        
-        location, _ = os.path.split(img)
-        _, folder = os.path.split(location)
-        return folder
-
-
-class PlantLeaves(TextureDataset):
-    r"""Class for PlantLeaves dataset.
-                
-    Notes
-    -----
-    PlantLeaves consists of 1200 images of leaves of 20 plant species 
-    (20 classes x 20 leaves/class x 3 samples/leave).
-        
-    Image format : .png (RGB)
-    Sample size : 128x128 px
-                
-    Examples
-    --------
-    Sample file name : c017\c01_011_a_w03.png
-        class : c01
-        leave : 011
-        sample : 03
-
-    References
-    ----------
-    .. [1] Plant Leaf Identification Using Gabor Wavelets
-           Dalcimar Casanova, Jarbas Joaci de Mesquita Sá Junior, Odemir 
-           Martinez Bruno
-           https://doi.org/10.1002/ima.20201
-    """
-
-
-    def __init__(self, dirpath):
-        super(PlantLeaves, self).__init__(dirpath)
-        self.acronym = 'Plant'
-
-
-    def get_class(self, img):
-        """Returns the class of the given img."""
         location, _ = os.path.split(img)
         _, folder = os.path.split(location)
         return folder
