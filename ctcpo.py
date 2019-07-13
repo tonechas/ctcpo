@@ -374,20 +374,22 @@ def extract_features(folder, datasets, descriptors):
     utils.boxed_text('Extracting features...', symbol='*')
     print(f'Setting up the datasets and descriptors...\n')
 
-    for dat, descr in itertools.product(datasets, descriptors):
-        dat_id = dat.acronym
-        for rad in descr.radius:
-            descr_single = copy.deepcopy(descr)
-            descr_single.radius = [rad]
-            descr_single_id = descr_single.abbrev()
-            feat_path = utils.filepath(folder, dat_id, descr_single_id)
-            print(f'Computing {dat_id}--{descr_single_id}', flush=True)
-            if not os.path.isfile(feat_path):
-                try:
-                    X = apply_descriptor(dat, descr_single, print_info=False)
-                    utils.save_object(X, feat_path)
-                except MemoryError:
-                    print(f'MemoryError: skipping {dat_id}--{descr_single_id}')
+    for dat in datasets:
+        for descr in descriptors:
+            dat_id = dat.acronym
+            for rad in descr.radius:
+                descr_single = copy.deepcopy(descr)
+                descr_single.radius = [rad]
+                descr_single_id = descr_single.abbrev()
+                feat_path = utils.filepath(folder, dat_id, descr_single_id)
+                print(f'Computing {dat_id}--{descr_single_id}', flush=True)
+                if not os.path.isfile(feat_path):
+                    try:
+                        X = apply_descriptor(dat, descr_single)
+                        utils.save_object(X, feat_path)
+                    except MemoryError:
+                        print(f'MemoryError: skipping {dat_id}--'
+                              f'{descr_single_id}')
     print()
 
 
@@ -425,8 +427,12 @@ def get_features(folder, dataset, descriptor):
             X = utils.load_object(feat_path)
         else:
             print(f'Computing features {dataset_id}--{descr_single_id}')
-            X = apply_descriptor(dataset, descr_single, print_info=False)
-            utils.save_object(X, feat_path)
+            try:
+                X = apply_descriptor(dataset, descr_single)
+                utils.save_object(X, feat_path)
+            except MemoryError:
+                print(f'MemoryError: skipping {dataset_id}--{descr_single_id}')
+                break
         multiscale_features.append(X)
     else:
         X = np.concatenate(multiscale_features, axis=-1)
@@ -600,11 +606,11 @@ def job_script():
     print('Generating job script...\n')
     import psutil
 #    for dat, descr in itertools.product(datasets, descriptors):
-    for dat in datasets:
-        for descr in descriptors:
+    for dat in gen_datasets(config.imgs, args.dataset):
+        print(psutil.virtual_memory(), flush=True)
+        for descr in gen_descriptors(args):
             dat_id = dat.acronym
             for rad in descr.radius:
-                print(psutil.virtual_memory(), flush=True)
                 try:
                     descr_single = copy.deepcopy(descr)
                     descr_single.radius = [rad]
