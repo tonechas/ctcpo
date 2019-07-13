@@ -596,7 +596,6 @@ class HEP(object):
 class Concatenation(object):
     """Class for concatenation of HEP descriptors."""
 
-
     def __init__(self, *descriptors):
         self.descriptors = descriptors
 
@@ -618,8 +617,8 @@ class CompletedLocalBinaryCountSM(HEP):
            Completed Local Binary Count for Rotation Invariant Texture
            Classification
            https://doi.org/10.1109/TIP.2012.2204271
+    
     """
-
 
     def compute_dims(self, points):
         """Compute the dimension of the histogram for each neighbourhood."""
@@ -629,9 +628,7 @@ class CompletedLocalBinaryCountSM(HEP):
         elif self.order == 'product':
             return [((p + 2)*(p + 1)//2)**2 for p in self.points]
         else:
-            raise ValueError(
-                '{} order is not supported for {} descriptor'.format(
-                    self.order, self.__class__.__name__))
+            self.print_order_not_supported()
 
 
     def codemap(self, img, radius, points):
@@ -750,9 +747,7 @@ class CompletedLocalBinaryCountSMC(HEP):
         elif self.order == 'product':
             return [3*((p + 2)*(p + 1)//2)**2 for p in self.points]
         else:
-            raise ValueError(
-                '{} order is not supported for {} descriptor'.format(
-                    self.order, self.__class__.__name__))
+            self.print_order_not_supported()
 
 
     def codemap(self, img, radius, points):

@@ -38,6 +38,7 @@ import IPython
 import itertools
 import os
 import sys
+import psutil
 import textwrap
 import warnings
 
@@ -325,71 +326,91 @@ def apply_descriptor(dataset, descriptor, print_info=False):
     X : array
         Computed features. The number of rows is equal to the number of
         samples and the number of columns is equal to the dimensionality
-        of the feature space.
+        of the feature space. If an error occurs it returns `None`.
         
     """
-    need_uint8 = ('bitmixing', 'refcolor')
+    orders_for_gray = ('linear')
+    orders_for_uint8 = ('bitmixing', 'refcolor')
+    dataset_id = dataset.abbrev()
+    descriptor_id = descriptor.abbrev()
     order = descriptor.order
-    X = np.zeros(shape=(len(dataset.images), descriptor.dim), dtype=np.float64)
-    for i, image_path in enumerate(dataset.images):
-        if print_info:
-            print(image_path, flush=True)
-        img = io.imread(image_path)
-        # Remove the transparency layer if necessary
-        if img.ndim == 3 and img.shape[2] == 4:
-            img = img[:, :, :3]
-        # Check that img has the correct type
-        if order == 'linear' and img.ndim > 2:
-            img = color.rgb2gray(img)
-        if order in need_uint8 and img.dtype != np.uint8:
-            raise TypeError(f'Cannot compute {descriptor.abbrev()}.codemap() '
-                            f'{image_path} has to be numpy.uint8')        
-        X[i] = descriptor(img)
+    n_samples = len(dataset.images)
+    n_features = descriptor.dim
+    try:
+        X = np.zeros(shape=(n_samples, n_features), dtype=np.float64)
+        for index, image_path in enumerate(dataset.images):
+            if print_info:
+                print(image_path, flush=True)
+            img = io.imread(image_path)
+            # Check that img is a colour image
+            if (img.ndim == 3) and (3 <= img.shape[2] <= 4):
+                # Remove the transparency layer if necessary
+                if img.shape[2] == 4:
+                    img = img[:, :, :3]
+                # Convert to grayscale if necessary
+                if order in orders_for_gray:
+                    img = color.rgb2gray(img)
+                # Check that dtype of img is np.uint8
+                if order in orders_for_uint8 and img.dtype != np.uint8:
+                    print(f'Cannot compute {descriptor_id}.codemap() '
+                          f'{image_path} has to be numpy.uint8')
+                    raise TypeError
+            # Check that img is a grayscale image and the order is compatible
+            elif not (img.ndims == 2 and order in orders_for_gray):
+                print(f'Cannot compute {descriptor_id}.codemap() '
+                      f'{image_path} has to be a colour image')
+                raise ValueError
+            X[index] = descriptor(img)
+
+    except Exception as ex:
+        error_id = ex.__class__.__name__
+        print(f'{error_id}: skipping {dataset_id}--{descriptor_id}')
+        if error_id == 'MemoryError':
+            print(psutil.virtual_memory(), flush=True)
+        X = None
+
     return X
 
 
-def extract_features(folder, datasets, descriptors):
+def extract_features(data_folder, imgs_folder, args):
     """"
-    extract_features(folder, datasets, descriptors)
+    extract_features(data_folder, imgs_folder, args)
     
     Compute texture features.
     
-    Check whether features have been already computed. If not, extract
-    features from each dataset in `datasets` using each descriptor in
-    `descriptors` and save them to disk. If the descriptor is multi-scale, 
+    Check whether features have been already computed. If they haven't, 
+    extract features from each dataset using each descriptor in
+    `args` and save them to disk. If the descriptor is multi-scale, 
     a separate file is created for each single value of the radius.
 
     Parameters
     ----------
-    folder : string
+    data_folder : string
         Full path of the folder where data are saved.
-    datasets : generator
-        Generator of instances of `texdata.TextureDataset` (for example 
-        `Kather`, `MondialMarmi20`, etc.) to extract features from.
-    descriptors : generator
-        Generator of instances of `hep.HEP` (for example `RankTransform`,
-        `LocalDirectionalRankCoding`, etc.) used to compute features.
+    imgs_folder : string
+        Full path of the folder where texture datasets are stored.
+    args : argparse.Namespace
+        Command line arguments.
         
     """
     utils.boxed_text('Extracting features...', symbol='*')
     print(f'Setting up the datasets and descriptors...\n')
 
-    for dat in datasets:
-        for descr in descriptors:
+    for dat in gen_datasets(imgs_folder, args.dataset):
+        for descr in gen_descriptors(args):
             dat_id = dat.acronym
             for rad in descr.radius:
-                descr_single = copy.deepcopy(descr)
-                descr_single.radius = [rad]
-                descr_single_id = descr_single.abbrev()
-                feat_path = utils.filepath(folder, dat_id, descr_single_id)
-                print(f'Computing {dat_id}--{descr_single_id}', flush=True)
-                if not os.path.isfile(feat_path):
-                    try:
-                        X = apply_descriptor(dat, descr_single)
+                descr_rad = copy.deepcopy(descr)
+                descr_rad.radius = [rad]
+                descr_rad_id = descr_rad.abbrev()
+                feat_path = utils.filepath(data_folder, dat_id, descr_rad_id)
+                if os.path.isfile(feat_path):
+                    print(f'Found {dat_id}--{descr_rad_id}', flush=True)
+                else:
+                    print(f'Computing {dat_id}--{descr_rad_id}', flush=True)
+                    X = apply_descriptor(dat, descr_rad)
+                    if X is not None:
                         utils.save_object(X, feat_path)
-                    except MemoryError:
-                        print(f'MemoryError: skipping {dat_id}--'
-                              f'{descr_single_id}')
     print()
 
 
@@ -413,7 +434,8 @@ def get_features(folder, dataset, descriptor):
     X : array
         Texture features. The number of rows is equal to the number of
         samples and the number of columns is equal to the dimensionality
-        of the feature space.
+        of the feature space. If an error occurs whitin the call to 
+        `apply_descriptor`, returns None.
         
     """
     multiscale_features = []
@@ -427,11 +449,10 @@ def get_features(folder, dataset, descriptor):
             X = utils.load_object(feat_path)
         else:
             print(f'Computing features {dataset_id}--{descr_single_id}')
-            try:
-                X = apply_descriptor(dataset, descr_single)
+            X = apply_descriptor(dataset, descr_single)
+            if X is not None:
                 utils.save_object(X, feat_path)
-            except MemoryError:
-                print(f'MemoryError: skipping {dataset_id}--{descr_single_id}')
+            else:
                 break
         multiscale_features.append(X)
     else:
@@ -550,10 +571,8 @@ def classify(folder, datasets, descriptors, estimators, test_size, n_tests,
         if os.path.isfile(result_path):
             result = utils.load_object(result_path)
         else:
-            try:
-                X = get_features(folder, dat, descr)
-            except MemoryError:
-                print(f'MemoryError: skipping {dat_id}--{descr_id}--{clf_id}')
+            X = get_features(folder, dat, descr)
+            if X is None:
                 continue
             y = dat.labels
             np.random.seed(random_state)
@@ -604,7 +623,6 @@ def classify(folder, datasets, descriptors, estimators, test_size, n_tests,
 
 def job_script():
     print('Generating job script...\n')
-    import psutil
 #    for dat, descr in itertools.product(datasets, descriptors):
     for dat in gen_datasets(config.imgs, args.dataset):
         print(psutil.virtual_memory(), flush=True)
@@ -806,7 +824,7 @@ if __name__ == '__main__':
     parser = make_parser()
     if len(sys.argv) == 1:
         # No command-line arguments, intended for running the program from IDE
-        testargs = ['@args_one.txt', '--action', 'efc']
+        testargs = ['@args_one.txt', '--action', 'ef']
         #testargs = '--act j --dataset CBT --desc RankTransform'.split()
         fake_argv = [sys.argv[0]] + testargs
         with patch.object(sys, 'argv', fake_argv):
@@ -831,21 +849,21 @@ if __name__ == '__main__':
     
     # Make sure data directory exists
     IPython.utils.path.ensure_dir_exists(config.data)
-
+    
     # Set up the generators of datasets and descriptors
     datasets = gen_datasets(config.imgs, args.dataset)
     descriptors = gen_descriptors(args)
-    
+
     # Execute the proper action
     option = args.action.lower()
     if option == 'ef':
-        extract_features(config.data, datasets, descriptors)
+        extract_features(config.data, config.imgs, args)
     elif option == 'c':
         classify(config.data, datasets, descriptors, 
                  config.estimators, config.test_size, 
                  config.n_tests, config.n_folds, config.random_state)
     elif option == 'efc':
-        extract_features(config.data, datasets, descriptors)
+        extract_features(config.data, config.imgs, args)
         # The generators are now exhausted and need to be refreshed
         datasets = gen_datasets(config.imgs, args.dataset)
         descriptors = gen_descriptors(args)
