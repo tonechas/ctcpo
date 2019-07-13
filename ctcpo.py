@@ -597,19 +597,22 @@ def classify(folder, datasets, descriptors, estimators, test_size, n_tests,
 
 
 def job_script():
-    print('Generating jo script...\n')
+    print('Generating job script...\n')
     import psutil
-    for dat, descr in itertools.product(datasets, descriptors):
-        dat_id = dat.acronym
-        for rad in descr.radius:
-            descr_single = copy.deepcopy(descr)
-            descr_single.radius = [rad]
-            descr_single_id = descr_single.abbrev()
-            print(f'Computing {dat_id}--{descr_single_id}', flush=True)
-            try:
-                print(f'{psutil.virtual_memory()[3]/(1024**2):.1f}', flush=True)
-            except MemoryError:
-                print(f'MemoryError: skipping {dat_id}--{descr_single_id}', flush=True)
+#    for dat, descr in itertools.product(datasets, descriptors):
+    for dat in datasets:
+        for descr in descriptors:
+            dat_id = dat.acronym
+            for rad in descr.radius:
+                print(psutil.virtual_memory(), flush=True)
+                try:
+                    descr_single = copy.deepcopy(descr)
+                    descr_single.radius = [rad]
+                    descr_single_id = descr_single.abbrev()
+                    print(f'Computing {dat_id}--{descr_single_id}', flush=True)
+#                    print(f'{psutil.virtual_memory()[3]/(1024**2):.1f}', flush=True)
+                except MemoryError:
+                    print(f'MemoryError: skipping {dat_id}--{descr_single_id}', flush=True)
     print()
     
 #def job_script(folder, job_id, partition, datasets, descriptors, estimators=None)#data, loops):

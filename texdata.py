@@ -82,9 +82,68 @@ class TextureDataset(object):
         return self.__class__.__name__
 
 
+class CBT(TextureDataset):
+    r"""Class for Coloured Brodatz Textures dataset.
+
+    Notes
+    -----
+    CBT is a colourised version of Brodatz's album. There are 112 
+    classes (labeled from `D001` to `D112`), one image sample for 
+    each class, which has been subdivided into 16 non-overlapping 
+    sub-images (numbered from 1 to 16), resulting in a total of 
+    1792 samples. It should be noted that a few samples of classes 
+    D043 and D044 are flat. Classes D039, D040, D041, D042, D043, 
+    D044, D045, D059, D062, D069, D070 and D097 are not stationary 
+    textures.
+
+    Image format : .tif (RGB)
+    Sample size : 160x160 px
+
+    >>> import config
+    >>> cbt = CBT(os.path.join(config.imgs, 'CBT'))
+    >>> cbt.acronym
+    'CBT'
+    >>> len(cbt.classes)
+    112
+    >>> _, imgname = os.path.split(cbt.images[0])
+    >>> imgname
+    'D1_COLORED_1.tif'
+    >>> cbt.get_class(cbt.images[0])
+    'D001'
+    >>> len(cbt.images)
+    1792
+
+    References
+    ----------
+    .. [1] https://bit.ly/2LgkCnX
+    
+    """
+
+    def __init__(self, dirpath):
+        super().__init__(dirpath)
+        self.acronym = 'CBT'
+
+
+    def get_class(self, img):
+        """Extract the class label from the given image file name."""
+        head, _ = os.path.split(img)
+        _, tail = os.path.split(head)
+        return tail
+
+
 class NewBarkTex(TextureDataset):
     """Class for New BarkTex dataset.
     
+    Notes
+    -----
+    New BarkTex is a collage of different types of tree bark derived from 
+    the BarkTex database. This dataset includes 6 classes with 68 images 
+    per class, each of them is split into 4 sub-images, resulting in a 
+    total of 1632 samples.
+        
+    Image format : .bmp (RGB)
+    Sample size : 64x64 px
+
     Examples
     --------
     >>> import config
@@ -104,15 +163,6 @@ class NewBarkTex(TextureDataset):
     >>> len(nbt.images)
     1632
                 
-    Notes
-    -----
-    New BarkTex is a collage of different types of tree bark derived from 
-    the BarkTex database. This dataset includes 6 classes with 68 samples 
-    per class, resulting in a total of 408 samples.
-        
-    Image format : .bmp (RGB)
-    Sample size : 64x64 px
-
     References
     ----------
     .. [1] https://bit.ly/2G6WH68
@@ -133,44 +183,6 @@ class NewBarkTex(TextureDataset):
 
     
 ##############################################################################
-
-class CBT(TextureDataset):
-    r"""Class for Coloured Brodatz Textures dataset.
-
-    Notes
-    -----
-    CBT is a colourised version of Brodatz's album. There are 112 classes,
-    one image sample for each class, which has been subdivided into 16
-    non-overlapping sub-images. It should be noted that a few samples of
-    classes D043 and D044 are flat. Classes D039, D040, D041, D042, D043,
-    D044, D045, D059, D062, D069, D070 and D097 are not stationary textures.
-
-    Image format : .tif (RGB)
-    Sample size : 160x160 px
-
-    Examples
-    --------
-    Sample file name : D046\D46_COLORED_13.tif
-        class : D046
-        sample : 13
-
-    References
-    ----------
-    .. [1] https://multibandtexture.recherche.usherbrooke.ca/colored%20_brodatz.html
-    """
-
-
-    def __init__(self, dirpath):
-        super(CBT, self).__init__(dirpath)
-        self.acronym = 'CBT'
-
-
-    def get_class(self, img):
-        """Extract the class label from the given image file name."""
-        head, tail = os.path.split(img)
-        head, tail = os.path.split(head)
-        return tail
-
 
 #class Drexel(TextureDataset):
 #    r"""Class for the Drexel dataset.
