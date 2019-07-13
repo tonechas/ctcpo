@@ -1,8 +1,9 @@
 """Utility functions for Texture Classification through Partial Orders.
 !!!
 """
-
+import bz2
 import os
+
 import _pickle as pickle
 
 
@@ -71,7 +72,8 @@ def load_object(path):
     obj : any type
         Object loaded from disk.
     """
-    with open(path, 'rb') as fid:
+    with bz2.BZ2File(path, 'rb') as fid:
+#    with open(path, 'rb') as fid:
         obj = pickle.load(fid)
     return obj
 
@@ -86,7 +88,8 @@ def save_object(obj, path):
     path : str
         Full path of the file where the object will be stored.
     """
-    with open(path, 'wb') as fid:
+    with bz2.BZ2File(path, 'wb') as fid:
+#    with open(path, 'wb') as fid:
         pickle.dump(obj, fid, protocol=2)
 
 

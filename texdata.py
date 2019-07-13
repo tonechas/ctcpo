@@ -277,6 +277,90 @@ class NewBarkTex(TextureDataset):
         return folder
 
     
+class PapSmear(TextureDataset):
+    """Class for PapSmear dataset.
+                
+    Notes
+    -----
+    PapSmear consists of 917 images of Pap-smear cells of seven classes, 
+    that are grouped into two classes, namely classes 1-3 are normal cells 
+    (242 samples), and classes 4-7 are abnormal cells (675 samples).
+        
+    Image format : .bmp (RGB)
+    Sample size : 32-409 x  40-768 px (range of nrows x range of ncols) 
+                  43x45 - 300x768 px (range of number of pixels)
+    Sample name : 3--Normal--Columnar epithelial/153956040-153956058-001.BMP
+        class : Normal for two-class classification
+                Columnar epithelial (3) for seven-class classification
+
+    Examples
+    --------
+    >>> import config
+    >>> ps2 = PapSmear(os.path.join(config.imgs, 'PapSmear'))
+    >>> ps2.acronym
+    'Pap2'
+    >>> ps7 = PapSmear(os.path.join(config.imgs, 'PapSmear'), n_classes=7)
+    >>> ps7.acronym
+    'Pap7'
+    >>> for name, index in ps2.classes.items(): print(f"'{name}': {index}")
+    'Abnormal': 0
+    'Normal': 1
+    >>> for name, index in ps7.classes.items(): print(f"'{name}': {index}")
+    'Columnar epithelial': 0
+    'Intermediate squamous epithelial': 1
+    'Mild squamous non-keratinizing dysplasia': 2
+    'Moderate squamous non-keratinizing dysplasia': 3
+    'Severe squamous non-keratinizing dysplasia': 4
+    'Squamous cell carcinoma in situ intermediate': 5
+    'Superficial squamous epithelial': 6
+    >>> len(ps2.images)
+    917
+    >>> n = 0
+    >>> head, imgname = os.path.split(ps2.images[n])
+    >>> imgname
+    '153958345-153958392-001.BMP'
+    >>> _, foldername = os.path.split(head)
+    >>> foldername
+    '1--Normal--Superficial squamous epithelial'
+    >>> ps2.get_class(ps2.images[n])
+    'Normal'
+    >>> ps7.get_class(ps7.images[n])
+    'Superficial squamous epithelial'
+    >>> try:
+    ...     ps5 = PapSmear(os.path.join(config.imgs, 'PapSmear'), n_classes=5)
+    ... except ValueError:
+    ...     pass
+    ...
+    ValueError: Invalid number of classes: 5
+    Use n_classes=2 or n_classes=7
+    
+    References
+    ----------
+    .. [1] Pap-smear Benchmark Data For Pattern Classification
+           Jan Jantzen, Jonas Norup, George Dounias, Beth Bjerregaard
+           https://bit.ly/2r7gBpU
+    
+    """
+    def __init__(self, dirpath, n_classes=2):
+        if n_classes not in (2, 7):
+            print (f'ValueError: Invalid number of classes: {n_classes}\n'
+                   f'Use n_classes=2 or n_classes=7')
+            raise ValueError
+        self.n_classes = n_classes
+        super().__init__(dirpath)
+        self.acronym = f'Pap{self.n_classes}'
+
+    def get_class(self, img):
+        """Returns the class of the given img."""
+        location, _ = os.path.split(img)
+        _, folder = os.path.split(location)
+        
+        if self.n_classes == 2:
+            return folder.split('--')[1]
+        elif self.n_classes == 7:
+            return folder.split('--')[-1]
+
+
 ##############################################################################
 
 #class Drexel(TextureDataset):
@@ -602,55 +686,6 @@ class Outex13(TextureDataset):
         return os.path.split(head)[-1]
 
 
-class PapSmear(TextureDataset):
-    r"""Class for PapSmear dataset.
-                
-    Notes
-    -----
-    PapSmear consists of 917 images of Pap-smear cells of seven classes, 
-    that are grouped into two classes, namely classes 1-3 are normal cells 
-    (242 samples), and classes 4-7 are abnormal cells (675 samples).
-        
-    Image format : .bmp (RGB)
-    Sample size : 32-409 x  40-768 px (range of nrows x range of ncols) 
-                  43x45 - 300x768 px (range of number of pixels)
-                
-    Examples
-    --------
-    Sample file name : 3--Normal--Columnar epithelial\153956040-153956058-001.BMP
-        class : Normal for two-class classification
-                Columnar epithelial (3) for seven-class classification
-
-    References
-    ----------
-    .. [1] Pap-smear Benchmark Data For Pattern Classification
-           Jan Jantzen, Jonas Norup, George Dounias, Beth Bjerregaard
-           https://bit.ly/2r7gBpU
-    """
-
-    def __init__(self, dirpath, n_classes=2):
-        self.n_classes = n_classes
-        super(PapSmear, self).__init__(dirpath)
-        self.acronym = 'Pap{}'.format(self.n_classes)
-
-
-    ## Returns the class of the img
-    def get_class(self, img):
-        """Returns the class of the given img."""
-        location, _ = os.path.split(img)
-        _, folder = os.path.split(location)
-        
-        if self.n_classes == 2:
-            return folder.split('--')[1]
-        elif self.n_classes == 7:
-            return folder.split('--')[-1]
-        else:
-            msg = textwrap.dedent('''Wrong number of classes: {}
-                                     (allowed values are 2 and 7)
-                                     '''.format(self.n_classes))
-            raise ValueError(msg)
-
-    
 class Parquet(TextureDataset):
     r"""Class for Parquet dataset.
     Notes
