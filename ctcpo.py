@@ -331,7 +331,7 @@ def apply_descriptor(dataset, descriptor, print_info=False):
     """
     orders_for_gray = ('linear')
     orders_for_uint8 = ('bitmixing', 'refcolor')
-    dataset_id = dataset.abbrev()
+    dataset_id = dataset.acronym
     descriptor_id = descriptor.abbrev()
     order = descriptor.order
     n_samples = len(dataset.images)
@@ -706,9 +706,9 @@ def generate_latex(args):
     print('Generating LaTeX...')
 
 
-def delete_files(folder, datasets, descriptors, estimators=None, both=True):
+def delete_files(data_folder, imgs_folder, args, estimators=None, both=True):
     '''
-    delete_files(folder, datasets, descriptors, estimators=None, both=True)
+    delete_files(data_folder, imgs_folder, args estimators=None, both=True)
     
     Delete previously computed features or classification results.
 
@@ -718,12 +718,12 @@ def delete_files(folder, datasets, descriptors, estimators=None, both=True):
 
     Parameters
     ----------
-    folder : str
+    data_folder : str
         Path of the folder where data are stored.
-    datasets : generator of `texdata.TextureDataset` instances
-        Texture datasets.
-    descriptors : generator of `hep.HEP` instances
-        Image descriptors.
+    imgs_folder : string
+        Full path of the folder where texture datasets are stored.
+    args : argparse.Namespace
+        Command line arguments.
     estimators : list of tuples, optional (default `None`)
         Estimators used to assess generalization error. List of tuples 
         of the form (classifier, parameters).
@@ -741,22 +741,28 @@ def delete_files(folder, datasets, descriptors, estimators=None, both=True):
         outcome = 'features'
     ans = input(f'Are you sure you want to delete {outcome}? (Y/[N]) ')
     print()
-    
+
+    utils.boxed_text('Extracting features...', symbol='*')
+    print(f'Setting up the datasets and descriptors...\n')
+
     if ans and 'yes'.startswith(ans.lower()):
         print(f'Preparing to delete {outcome}...\n')
-        for dat, descr in itertools.product(datasets, descriptors):
-            dat_id = dat.acronym
-            for rad in descr.radius:
-                descr_single = copy.deepcopy(descr)
-                descr_single.radius = [rad]
-                descr_single_id = descr_single.abbrev()
-                feat_args = [folder, dat_id, descr_single_id]
-                if both or (estimators is None):
-                     utils.attempt_to_delete_file(utils.filepath(*feat_args))
-                if both or (estimators is not None):
-                    for clf, _ in estimators:
-                        res_args = feat_args + [clf.__name__]
-                        utils.attempt_to_delete_file(utils.filepath(*res_args))
+        for dat in gen_datasets(imgs_folder, args.dataset):
+            for descr in gen_descriptors(args):
+                dat_id = dat.acronym
+                for rad in descr.radius:
+                    descr_single = copy.deepcopy(descr)
+                    descr_single.radius = [rad]
+                    descr_single_id = descr_single.abbrev()
+                    feat_args = [data_folder, dat_id, descr_single_id]
+                    if both or (estimators is None):
+                        fname = utils.filepath(*feat_args)
+                        utils.attempt_to_delete_file(fname)
+                    if both or (estimators is not None):
+                        for clf, _ in estimators:
+                            res_args = feat_args + [clf.__name__]
+                            fname = utils.filepath(*res_args)
+                            utils.attempt_to_delete_file(fname)
     else:
         print(f'No {outcome} deleted\n')
     print()
@@ -875,12 +881,12 @@ if __name__ == '__main__':
     elif option == 'l':
         generate_latex(args)
     elif option == 'df':
-        delete_files(config.data, datasets, descriptors, both=False)
+        delete_files(config.data, config.imgs, args, both=False)
     elif option == 'dr':
-        delete_files(config.data, datasets, descriptors, 
+        delete_files(config.data, config.imgs, args, 
                      config.estimators, both=False)
     elif option == 'da':
-        delete_files(config.data, datasets, descriptors, 
+        delete_files(config.data, config.imgs, args, 
                      config.estimators, both=True)
     else:
         print(f"Argument \"--action {args.action}\" is not valid")

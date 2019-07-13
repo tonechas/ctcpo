@@ -105,20 +105,19 @@ class CBT(TextureDataset):
     'CBT'
     >>> len(cbt.classes)
     112
+    >>> len(cbt.images)
+    1792
     >>> _, imgname = os.path.split(cbt.images[0])
     >>> imgname
     'D1_COLORED_1.tif'
     >>> cbt.get_class(cbt.images[0])
     'D001'
-    >>> len(cbt.images)
-    1792
 
     References
     ----------
     .. [1] https://bit.ly/2LgkCnX
     
     """
-
     def __init__(self, dirpath):
         super().__init__(dirpath)
         self.acronym = 'CBT'
@@ -129,6 +128,53 @@ class CBT(TextureDataset):
         head, _ = os.path.split(img)
         _, tail = os.path.split(head)
         return tail
+
+
+class ForestMacro(TextureDataset):
+    """Class for ForestMacro dataset.
+
+    Notes
+    -----  
+    The Forest Species Database - Macro is composed of 2942 macroscopic 
+    images from 41 different forest species (classes) of the Brazilian flora. 
+    There are between 37 and 99 samples per class. The database was 
+    collected using a Sony DSC T20 with the macro function activated. 
+    The resulting images are then saved in JPG format with no compression.
+    
+    Image format : .jpg (RGB)
+    Sample size : 2448x3264 px
+
+    Examples
+    --------
+    >>> import config
+    >>> foma = ForestMacro(os.path.join(config.imgs, 'ForestMacro'))
+    >>> foma.acronym
+    'ForestMacro'
+    >>> len(foma.classes)
+    41
+    >>> len(foma.images)
+    2942
+    >>> n = 8
+    >>> _, imgname = os.path.split(foma.images[n])
+    >>> imgname
+    '0109.JPG'
+    >>> foma.get_class(foma.images[n])
+    '01'
+
+    References
+    ----------
+    .. [1] https://bit.ly/2LqVs6b
+
+    """
+    def __init__(self, dirpath):
+        super().__init__(dirpath)
+        self.acronym = 'ForestMacro'
+
+
+    def get_class(self, img):
+        """Extract the class label from the given image file name."""
+        _, filename = os.path.split(img)
+        return filename[:2]
 
 
 class NewBarkTex(TextureDataset):
@@ -158,18 +204,16 @@ class NewBarkTex(TextureDataset):
     QuercusRobus
     RobiniaPseudacacia
     >>> _, imgname = os.path.split(nbt.images[0])
-    >>> imgname
-    '000000.bmp'
     >>> len(nbt.images)
     1632
+    >>> imgname
+    '000000.bmp'
                 
     References
     ----------
     .. [1] https://bit.ly/2G6WH68
     
     """
-
-
     def __init__(self, dirpath):
         super().__init__(dirpath)
         self.acronym = 'NewBarkTex'
@@ -265,43 +309,6 @@ class NewBarkTex(TextureDataset):
 #            return 'Ambient'
 #        else:
 #            raise ValueError('Incorrect image number') 
-
-
-class ForestMacro(TextureDataset):
-    r"""Class for ForestMacro dataset.
-
-    Notes
-    -----  
-    The Forest Species Database - Macro is composed of 2942 macroscopic 
-    images from 41 different forest species (classes) of the Brazilian flora. 
-    There are between 37 and 99 samples per class. The database was 
-    collected using a Sony DSC T20 with the macro function activated. 
-    The resulting images are then saved in JPG format with no compression.
-    
-    Image format : .jpg (RGB)
-    Sample size : 2448x3264 px
-
-    Examples
-    --------
-    Sample file name : 0503.jpg
-        class : 05
-        sample : 03
-
-    References
-    ----------
-    .. [1] https://web.inf.ufpr.br/vri/databases/forest-species-database-macroscopic/
-    """
-
-
-    def __init__(self, dirpath):
-        super(ForestMacro, self).__init__(dirpath)
-        self.acronym = 'ForestMacro'
-
-
-    def get_class(self, img):
-        """Extract the class label from the given image file name."""
-        _, filename = os.path.split(img)
-        return filename[:2]
 
 
 class ForestMicro(TextureDataset):
