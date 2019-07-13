@@ -177,6 +177,57 @@ class ForestMacro(TextureDataset):
         return filename[:2]
 
 
+class ForestMicro(TextureDataset):
+    """Class for ForestMicro dataset.
+
+    Notes
+    -----
+    The Forest Species Database - Micro comprehends 2240 microscopic 
+    images representing samples from 112 species (classes) from 2 groups 
+    (hardwood and softwood), 85 genera and 30 families. There are 20 
+    samples per class, numbered from 1 to 20. The images were acquired 
+    from the sheets of wood using a Olympus Cx40 microscope with 
+    100 times zoom.
+
+    Image format : .png (RGB)
+    Sample size : 768x1024 px
+    Sample file name : Hardwood/046 Copaifera trapezifolia/04605.png
+        class : 046 Copaifera trapezifolia
+        sample : 05
+
+    Examples
+    --------
+    >>> import config
+    >>> fomi = ForestMicro(os.path.join(config.imgs, 'ForestMicro'))
+    >>> fomi.acronym
+    'ForestMicro'
+    >>> len(fomi.classes)
+    112
+    >>> len(fomi.images)
+    2240
+    >>> n = 164
+    >>> _, imgname = os.path.split(fomi.images[n])
+    >>> imgname
+    '04605.png'
+    >>> fomi.get_class(fomi.images[n])
+    '046 Copaifera trapezifolia'
+
+    References
+    ----------
+    .. [1] https://bit.ly/2Y6pUIo
+    """
+    def __init__(self, dirpath):
+        super(ForestMicro, self).__init__(dirpath)
+        self.acronym = 'ForestMicro'
+
+
+    def get_class(self, img):
+        """Extract the class label from the given image file name."""
+        head, _ = os.path.split(img)
+        _, tail = os.path.split(head)
+        return tail
+
+
 class NewBarkTex(TextureDataset):
     """Class for New BarkTex dataset.
     
@@ -309,44 +360,6 @@ class NewBarkTex(TextureDataset):
 #            return 'Ambient'
 #        else:
 #            raise ValueError('Incorrect image number') 
-
-
-class ForestMicro(TextureDataset):
-    r"""Class for ForestMicro dataset.
-
-    Notes
-    -----
-    The Forest Species Database - Micro comprehends 2240 microscopic images
-    representing samples from 112 species (classes) from 2 groups (hardwood
-    and softwood), 85 genera and 30 families. There are 20 samples per class.
-    The images were acquired from the sheets of wood using a Olympus Cx40
-    microscope with 100 times zoom.
-
-    Image format : .png (RGB)
-    Sample size : 768x1024 px
-
-    Examples
-    --------
-    Sample file name : Hardwood\046 Copaifera trapezifolia\04605.png
-        class : 046 Copaifera trapezifolia
-        sample : 05
-
-    References
-    ----------
-    .. [1] https://web.inf.ufpr.br/vri/databases/forest-species-database-microscopic/
-    """
-
-
-    def __init__(self, dirpath):
-        super(ForestMicro, self).__init__(dirpath)
-        self.acronym = 'ForestMicro'
-
-
-    def get_class(self, img):
-        """Extract the class label from the given image file name."""
-        head, _ = os.path.split(img)
-        _, tail = os.path.split(head)
-        return tail
 
 
 class Kather(TextureDataset):

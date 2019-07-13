@@ -3,7 +3,7 @@
 """
 
 import os
-import pickle
+import _pickle as pickle
 
 
 def boxed_text(txt, symbol='#'):
@@ -87,7 +87,7 @@ def save_object(obj, path):
         Full path of the file where the object will be stored.
     """
     with open(path, 'wb') as fid:
-        pickle.dump(obj, fid, 0)
+        pickle.dump(obj, fid, protocol=2)
 
 
 def filepath(folder, *args, ext='pkl'):
