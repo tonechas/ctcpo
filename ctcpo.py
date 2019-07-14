@@ -13,8 +13,8 @@ run via the command line or from the IDE.
 The main functionality is comprised of feature extraction and 
 classification. In addition, the program can automatically generate 
 the LaTeX source code for creating tables with the results of the 
-experiments as well as job scripts to be submitted to the queue manager 
-of Finis Terrae II supercomputer (CESGA).
+experiments as well as job scripts to be submitted to the queue 
+manager of Finis Terrae II supercomputer (CESGA).
 
 Examples
 --------
@@ -57,6 +57,7 @@ from sklearn.model_selection import train_test_split
 
 import texdata
 import hep
+import reportex
 import utils
 
 
@@ -262,18 +263,20 @@ def gen_datasets(folder, dataset_names):
         yield getattr(texdata, name)(os.path.join(folder, name))
 
 
-def gen_descriptors(args):
+def gen_descriptors(args, maxdim=2**16):
     """
-    gen_descriptors(args)
+    gen_descriptors(args, maxdim=2**16)
     
     Generator for texture descriptors.
 
     Parameters
     ----------
-    args : dict
-        Dictionary with the descriptors and the different options 
-        for the descriptors.
-
+    args : argparse.Namespace
+        Command line arguments.
+    maxdim : int, optional (default 2**16)
+        Maximum dimensionality of the descriptor. This limit is intended 
+        to avoid MemoryError when extracting features.
+        
     Yields
     ------
     Instance of the class `HEP` defined in module `hep`.
@@ -283,10 +286,8 @@ def gen_descriptors(args):
         '''Instantiate a HEP descriptor.'''
         return getattr(hep, name)(**parameters)
 
-    descriptors = args.descriptor
-    radii = args.radius
-    orders = args.order
-    for descr, radius, order in itertools.product(descriptors, radii, orders):
+    for descr, radius, order in itertools.product(
+            args.descriptor, args.radius, args.order):
         extra_keys = []
         params = {'radius': radius, 'order': order}
         if order in ('lexicographic', 'bitmixing'):
@@ -298,13 +299,17 @@ def gen_descriptors(args):
         elif order == 'random':
             extra_keys.append('seed')
         if not extra_keys:
-            yield instantiate_hep(descr, params)
+            obj = instantiate_hep(descr, params)
+            if obj.dim <= maxdim:
+                yield obj
         else:
             lists_of_values = [vars(args)[key] for key in extra_keys]
             for extra_values in itertools.product(*lists_of_values):
                 for key, value in zip(extra_keys, extra_values):
                     params[key] = value
-                yield instantiate_hep(descr, params)
+                obj = instantiate_hep(descr, params)
+                if obj.dim <= maxdim:
+                    yield obj
 
  
 def apply_descriptor(dataset, descriptor, print_info=False):
@@ -339,9 +344,6 @@ def apply_descriptor(dataset, descriptor, print_info=False):
     n_samples = len(dataset.images)
     n_features = descriptor.dim
     try:
-        # Collect garbage to avoid MemoryError
-        gc.collect()
-
         X = np.zeros(shape=(n_samples, n_features), dtype=np.float64)
         for index, image_path in enumerate(dataset.images):
             if print_info:
@@ -373,6 +375,7 @@ def apply_descriptor(dataset, descriptor, print_info=False):
         if error_id == 'MemoryError':
             print(psutil.virtual_memory(), flush=True)
             traceback.print_exc()
+            sys.stdout.flush()
         X = None
 
     return X
@@ -409,16 +412,17 @@ def extract_features(data_folder, imgs_folder, args):
                 descr_rad = copy.deepcopy(descr)
                 descr_rad.radius = [rad]
                 descr_rad_id = descr_rad.abbrev()
-#                feat_path = utils.filepath(data_folder, dat_id, descr_rad_id)
-                feat_path = utils.filepath(data_folder, dat_id, descr_rad_id, ext='npy')
+                feat_path = utils.filepath(data_folder, dat_id, descr_rad_id)
+#                feat_path = utils.filepath(data_folder, dat_id, descr_rad_id, ext='npy')
                 if os.path.isfile(feat_path):
                     print(f'Found {dat_id}--{descr_rad_id}', flush=True)
                 else:
                     print(f'Computing {dat_id}--{descr_rad_id}', flush=True)
                     X = apply_descriptor(dat, descr_rad)
                     if X is not None:
-#                        utils.save_object(X, feat_path)
-                        np.save(feat_path, X)
+                        utils.save_object(X, feat_path)
+#                        np.save(feat_path, X)
+                        del X
     print()
 
 
@@ -706,12 +710,13 @@ def job_script():
 #        save_job_script(job_file, script)
 #    print('Generating job script...')
 
-
 def generate_latex(args):
-    """
-    !!!
-    """
-    print('Generating LaTeX...')
+    """Automatically generate LaTeX source code for report"""
+    # Generate introductory sections
+    src = reportex.intro_dims(args)
+    print(src)
+    with open(os.path.join(config.data, 'report.tex'), 'w') as f:
+        print(src, file=f)
 
 
 def delete_files(data_folder, imgs_folder, args, estimators=None, both=True):
@@ -838,7 +843,7 @@ if __name__ == '__main__':
     parser = make_parser()
     if len(sys.argv) == 1:
         # No command-line arguments, intended for running the program from IDE
-        testargs = ['@args_one.txt', '--action', 'ef']
+        testargs = ['@args_one.txt', '--action', 'j']
         #testargs = '--act j --dataset CBT --desc RankTransform'.split()
         fake_argv = [sys.argv[0]] + testargs
         with patch.object(sys, 'argv', fake_argv):

@@ -5,7 +5,6 @@
 
 import os
 import imghdr
-import textwrap
 import numpy as np
 
 
@@ -83,7 +82,7 @@ class TextureDataset(object):
 
 
 class CBT(TextureDataset):
-    r"""Class for Coloured Brodatz Textures dataset.
+    """Class for Coloured Brodatz Textures dataset.
 
     Notes
     -----
@@ -228,6 +227,68 @@ class ForestMicro(TextureDataset):
         return tail
 
 
+class MondialMarmi20(TextureDataset):
+    """Class for MondialMarmi20 texture dataset.
+
+    Notes
+    -----
+    MondialMarmi20 comprises 25 classes of marble and granite products 
+    identified by their commercial denominations, e.g. Azul Platino, 
+    Bianco Sardo, Rosa Porriño and Verde Bahía. Each class is represented 
+    by 4 tiles; 10 images for each tile were acquired under steady 
+    illumination conditions and at rotation angles from 0 to 90 degrees 
+    by steps of 10 degrees.
+
+    Image format : .bmp (RGB)
+    Sample size : 1500x1500 px
+
+    Sample file name : AcquaMarina_A_00_01.bmp
+        class : AquaMarina_A
+        rotation : 00
+        sample : 01
+    
+    Examples
+    --------
+    >>> import config
+    >>> mm2 = MondialMarmi20(os.path.join(config.imgs, 'MondialMarmi20'))
+    >>> mm2.acronym
+    'Mond20'
+    >>> len(mm2.classes)
+    25
+    >>> len(mm2.images)
+    1000
+    >>> n = 0
+    >>> _, imgname = os.path.split(mm2.images[n])
+    >>> imgname
+    'AcquaMarina_A_00_01.bmp'
+    >>> mm2.get_class(mm2.images[n])
+    'AcquaMarina_A'
+    >>> mm2.get_rotation(mm2.images[n])
+    0
+    
+    References
+    ----------
+    .. [1] http://dismac.dii.unipg.it/mm/ver_2_0/index.html
+
+    """    
+    def __init__(self, dirpath):
+        super().__init__(dirpath)
+        self.rotations = np.array([self.get_rotation(x) for x in self.images])
+        self.acronym = 'Mond20'
+
+        
+    def get_class(self, img):
+        """Extract the class label from the given image file name."""        
+        _, filename = os.path.split(img)
+        return filename[:-10]
+
+                            
+    def get_rotation(self, img):
+        """Extract the rotation angle from the given image file name."""
+        _, filename = os.path.split(img)
+        return int(filename[-9:-7])
+    
+    
 class NewBarkTex(TextureDataset):
     """Class for New BarkTex dataset.
     
@@ -670,58 +731,12 @@ class KylbergSintorn(TextureDataset):
         return int(fname.split('-')[1][1:])
 
 
-class MondialMarmi20(TextureDataset):
-    """Class for MondialMarmi20 texture dataset.
-
-    Notes
-    -----
-    MondialMarmi20 comprises 25 classes of marble and granite products 
-    identified by their commercial denominations, e.g. Azul Platino, 
-    Bianco Sardo, Rosa Porriño and Verde Bahía. Each class is represented 
-    by 4 tiles; 10 images for each tile were acquired under steady 
-    illumination conditions and at rotation angles from 0 to 90 degrees 
-    by steps of 10 degrees.
-
-    Image format : .bmp (RGB)
-    Sample size : 1500x1500 px
-
-    Examples
-    --------
-    Sample file name : AcquaMarina_A_00_02.bmp
-        class : AquaMarina_A
-        rotation : 00
-        sample : 02
-    
-    References
-    ----------
-    .. [1] http://dismac.dii.unipg.it/mm/ver_2_0/index.html
-    """
-
-    
-    def __init__(self, dirpath):
-        super(MondialMarmi20, self).__init__(dirpath)
-        self.rotations = np.asarray([self.get_rotation(img) for img in self.images])
-        self.acronym = 'Mond20'
-
-        
-    def get_class(self, img):
-        """Extract the class label from the given image file name."""        
-        _, filename = os.path.split(img)
-        return filename[:-10]
-
-                            
-    def get_rotation(self, img):
-        """Extract the rotation angle from the given image file name."""
-        _, filename = os.path.split(img)
-        return int(filename[-9:-7])
-    
-    
 class Outex13(TextureDataset):
     """Class for the Outex13 dataset.
          
     Outex13 consists of 68 classes. The images were acquired under invariable 
     illumination conditions (rotation 0 degrees, illuminant INCA, resolution 
-    100 dpi) and subdivided into 20 non-overlapping subimages. resulting in a 
+    100 dpi) and subdivided into 20 non-overlapping subimages, resulting in a 
     total number of samples of 1360.
 
     Image format : .bmp (RGB)

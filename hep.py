@@ -1191,18 +1191,18 @@ class LocalDirectionalRankCoding(HEP):
 
         Examples
         --------
-        >>> d_lin = LocalDirectionalRankCoding(order='linear', radius=[1])
-        >>> d_lin.dims
-        [81]
+        >>> dlin = LocalDirectionalRankCoding(order='linear', radius=[1, 2, 3])
+        >>> dlin.dims
+        [81, 6561, 531441]
         >>> gray = np.array([[25, 33, 10],
         ...                  [53, 25, 75],
         ...                  [15, 17, 12]])
         ...
-        >>> d_lin.codemap(gray, radius=1, points=8)
+        >>> dlin.codemap(gray, radius=1, points=8)
         array([[42]])
-        >>> d_prod = LocalDirectionalRankCoding(order='product', radius=[1])
-        >>> d_prod.dims
-        [256]
+        >>> dp = LocalDirectionalRankCoding(order='product', radius=[1, 2, 3])
+        >>> dp.dims
+        [256, 65536, 16777216]
         >>> rgb = np.array([[[102, 220, 225],
         ...                  [ 95, 179,  61],
         ...                  [234, 203,  92]],
@@ -1213,7 +1213,7 @@ class LocalDirectionalRankCoding(HEP):
         ...                  [212, 153, 199],
         ...                  [188, 174,  65]]])
         ...
-        >>> d_prod.codemap(rgb, radius=1, points=8)
+        >>> dp.codemap(rgb, radius=1, points=8)
         array([[253]])
         
         """
