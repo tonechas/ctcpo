@@ -5,8 +5,8 @@ import bz2
 import os
 import traceback
 
-import _pickle as pickle
-
+import pickle
+import numpy as np
 
 def boxed_text(txt, symbol='#'):
     """Display a text enclosed on a rectangle whose lines are 
@@ -83,19 +83,30 @@ def load_object(path):
 
 
 def save_object(obj, path):
-    """Save an object to disk using pickle.
+    """Save an object to disk.
 
+    If the filename has extension `.pkl` the object is compressed using 
+    bz2 and saved using pickle, whereas if the extension is `.npy` 
+    NumPy is used instead.
+    
     Parameters
     ----------
     obj : any type
         Object to be saved.
     path : str
         Full path of the file where the object will be stored.
+
     """
+    _, ext = os.path.splitext(path)
     try:
-        with bz2.BZ2File(path, 'wb') as fid:
-        #with open(path, 'wb') as fid:
-            pickle.dump(obj, fid, protocol=2)
+        if ext.lower() == '.pkl':
+            with bz2.BZ2File(path, 'wb') as fid:
+            #with open(path, 'wb') as fid:
+                pickle.dump(obj, fid, protocol=pickle.HIGHEST_PROTOCOL)
+        elif ext.lower() == '.npy':
+            np.save(path, obj)
+        else:
+            raise ValueError(f"Invalid extension: {ext}, use '.pkl' or '.npy'")
     except Exception as error:
         traceback.print_exc()
 

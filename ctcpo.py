@@ -35,11 +35,13 @@ Examples
 
 import copy
 import IPython
+import gc
 import itertools
 import os
 import sys
 import psutil
 import textwrap
+import traceback
 import warnings
 
 import numpy as np
@@ -337,6 +339,9 @@ def apply_descriptor(dataset, descriptor, print_info=False):
     n_samples = len(dataset.images)
     n_features = descriptor.dim
     try:
+        # Collect garbage to avoid MemoryError
+        gc.collect()
+
         X = np.zeros(shape=(n_samples, n_features), dtype=np.float64)
         for index, image_path in enumerate(dataset.images):
             if print_info:
@@ -367,6 +372,7 @@ def apply_descriptor(dataset, descriptor, print_info=False):
         print(f'{error_id}: skipping {dataset_id}--{descriptor_id}')
         if error_id == 'MemoryError':
             print(psutil.virtual_memory(), flush=True)
+            traceback.print_exc()
         X = None
 
     return X
