@@ -35,7 +35,6 @@ Examples
 
 import copy
 import IPython
-import gc
 import itertools
 import os
 import sys

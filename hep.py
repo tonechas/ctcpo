@@ -10,6 +10,11 @@ import numpy as np
 import utils
 
 
+####################
+# HELPER FUNCTIONS #
+####################
+
+
 def square_frame_size(radius):
     """Compute the number of pixels of the external frame of square
     neighbourhoods of the given radii.
@@ -61,14 +66,6 @@ def histogram(codes, nbins):
     return h_norm
 
 #vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv#
-#_orders = ('linear',
-#           'product',
-#           'lexicographic',
-#           'alphamod',
-#           'bitmixing',
-#           'refcolor',
-#           'random')
-
 
 #def lexicographic_order(neighbour, central, bandperm=(0, 1, 2), comp=np.less):
 #    """
@@ -218,6 +215,15 @@ class HEP(object):
            http://dx.doi.org/10.1007/s10851-012-0349-8
 
     """
+    _canonical_orders = ('linear', 
+                         'lexicographic', 
+                         'alphamod', 
+                         'bitmixing', 
+                         'refcolor', 
+                         'random')
+    _product_orders = ('product',)
+
+
     def __init__(self, **kwargs):
         """Initializer of a HEP instance.
 
@@ -311,11 +317,9 @@ class HEP(object):
         raise NotImplementedError("Subclasses should implement this!")
 
 
-    def print_order_not_supported(self):
-        order = self.order
-        classname = self.__class__.__name__
-        msg = f'{order} order is not supported for {classname} descriptor'
-        raise ValueError(msg)
+    def raise_order_not_supported(self):
+        raise ValueError(
+                f'{self.order} order not supported for {self.abbrev()}')
 
     def __call__(self, img):
         """Compute the feature vector of an image through a HEP descriptor.
@@ -609,8 +613,37 @@ class Concatenation(object):
 
 
 class CompletedLocalBinaryCountSM(HEP):
-    """Return the completed local binary count features.
+    """Return the completed local binary count features (sign and magnitude).
 
+    Examples
+    --------
+    >>> sm = CompletedLocalBinaryCountSM(order='linear', radius=[1, 2, 3])
+    >>> sm.dims
+    [81, 289, 625]
+    >>> gray = np.array([[ 25, 33,  80,  94],
+    ...                  [141, 25, 175, 120],
+    ...                  [ 15, 17,  12, 203]], dtype=np.uint8)
+    ...
+    >>> sm.codemap(gray, 1, 8)
+    array([[33, 65]])
+    >>> smprod = CompletedLocalBinaryCountSM(order='product', radius=[1, 2, 3])
+    >>> smprod.dims
+    [2025, 23409, 105625]
+    >>> rgb = np.array([[[134,  98, 245],
+    ...                  [242, 123, 232],
+    ...                  [246,  98, 117],
+    ...                  [228, 164,  54]],
+    ...                 [[126,  75, 165],
+    ...                  [227, 241, 145],
+    ...                  [160,  38,  32],
+    ...                  [ 47,  10, 185]],
+    ...                 [[142, 246,  83],
+    ...                  [ 69, 153, 234],
+    ...                  [ 10, 118,  24],
+    ...                  [114,  94,  30]]], dtype=np.uint8)
+    >>> smprod.codemap(rgb, 1, 8)
+    array([[1049,  203]])
+    
     References
     ----------
     .. [1] Yang Zhao, De-Shuang Huang, and Wei Jia
@@ -622,13 +655,12 @@ class CompletedLocalBinaryCountSM(HEP):
 
     def compute_dims(self, points):
         """Compute the dimension of the histogram for each neighbourhood."""
-        if self.order in ('linear', 'lexicographic', 'alphamod',
-                          'bitmixing', 'refcolor', 'random'):
+        if self.order in self._canonical_orders:
             return [(p + 1)**2 for p in self.points]
-        elif self.order == 'product':
+        elif self.order in self._product_orders:
             return [((p + 2)*(p + 1)//2)**2 for p in self.points]
         else:
-            self.print_order_not_supported()
+            self.raise_order_not_supported()
 
 
     def codemap(self, img, radius, points):
@@ -648,8 +680,11 @@ class CompletedLocalBinaryCountSM(HEP):
         -------
         codes : array
             Map of feature values.
+            
         """
         central = img[radius: -radius, radius: -radius]
+
+        # Sign descriptor
         codes_s = np.zeros(shape=central.shape[:2], dtype=np.int_)
         lt_s = np.zeros_like(codes_s)
 
@@ -658,7 +693,6 @@ class CompletedLocalBinaryCountSM(HEP):
 
         for pixel in range(points):
             neighbour = utils.subimage(img, pixel, radius)
-
             lt_s += self.compare(neighbour, central, comp=np.less)
 
             if self.order == 'product':
@@ -666,129 +700,8 @@ class CompletedLocalBinaryCountSM(HEP):
 
         if self.order == 'product':
             dominated_s = lt_s
-            non_comparable_s = points - dominated_s - ge_s
-            codes_s = non_comparable_s + dominated_s*(2*points + 3 - dominated_s)//2
-        else:
-            codes_s = lt_s
-
-
-        m_map = np.zeros(shape=central.shape, dtype=np.float_)
-        for pixel in range(points):
-            neighbour = utils.subimage(img, pixel, radius)
-            m_map += np.abs(np.float_(neighbour) - central)
-        m_map /= points
-        if m_map.ndim > 2:
-            mp_avg = np.array([*map(np.mean, tuple(m_map.T))])
-            mp_avg = np.tile(mp_avg, m_map.shape[:2] + (1,))
-        else:
-            mp_avg = np.mean(m_map)
-            mp_avg = np.tile(mp_avg, m_map.shape[:2])
-
-        if self.order in ('bitmixing', 'random'):
-            # Mean and median values need to be cast to integer in order to
-            # be used as indices in the lut
-            mp_avg = np.int_(mp_avg)
-
-        codes_m = np.zeros(shape=central.shape[:2], dtype=np.int_)
-
-        lt_m = np.zeros(shape=central.shape[:2], dtype=np.int_)
-
-        if self.order == 'product':
-            ge_m = np.zeros_like(codes_m)
-
-        for pixel in range(points):
-            neighbour = utils.subimage(img, pixel, radius)
-            m_p = np.abs(np.float_(neighbour) - central)
-
-            if self.order in ('bitmixing', 'random'):
-            # Mean and median values need to be cast to integer in order to
-            # be used as indices in the lut
-                m_p = np.int_(m_p)
-
-            lt_m += self.compare(m_p, mp_avg, comp=np.less)
-
-            if self.order == 'product':
-                ge_m += self.compare(m_p, mp_avg, comp=np.greater_equal)
-
-        if self.order == 'product':
-            dominated_m = lt_m
-            non_comparable_m = points - dominated_m - ge_m
-            codes_m = non_comparable_m + dominated_m*(2*points + 3 - dominated_m)//2
-        else:
-            codes_m = lt_m
-
-        if self.order in ('linear', 'lexicographic', 'bitmixing',
-                          'alphamod', 'refcolor', 'random'):
-            ncodes = points + 1
-        elif self.order == 'product':
-            ncodes = (points + 2)*(points + 1)//2
-        codes = codes_m + ncodes*codes_s
-
-        return codes
-
-
-class CompletedLocalBinaryCountSMC(HEP):
-    """Return the completed local binary count features.
-
-    References
-    ----------
-    .. [1] Yang Zhao, De-Shuang Huang, and Wei Jia
-           Completed Local Binary Count for Rotation Invariant Texture
-           Classification
-           https://doi.org/10.1109/TIP.2012.2204271
-    """
-
-
-    def compute_dims(self, points):
-        """Compute the dimension of the histogram for each neighbourhood."""
-        if self.order in ('linear', 'lexicographic', 'bitmixing',
-                          'alphamod', 'refcolor', 'random'):
-            return [2*(p + 1)**2 for p in self.points]
-        elif self.order == 'product':
-            return [3*((p + 2)*(p + 1)//2)**2 for p in self.points]
-        else:
-            self.print_order_not_supported()
-
-
-    def codemap(self, img, radius, points):
-        """Return a map with the pattern codes of an image corresponding
-        to the local concave and convex micro-structure patterns coding.
-
-        Parameters
-        ----------
-        img : array
-            Color image.
-        radius : int
-            Radius of the local neighborhood.
-        points : int
-            Number of pixels of the local neighborhood.
-
-        Returns
-        -------
-        codes : array
-            Map of feature values.
-        """
-        central = img[radius: -radius, radius: -radius]
-
-        codes_s = np.zeros(shape=central.shape[:2], dtype=np.int_)
-
-        lt_s = np.zeros_like(codes_s)
-
-        if self.order == 'product':
-            ge_s = np.zeros_like(codes_s)
-
-        for pixel in range(points):
-            neighbour = utils.subimage(img, pixel, radius)
-
-            lt_s += self.compare(neighbour, central, comp=np.less)
-
-            if self.order == 'product':
-                ge_s += self.compare(neighbour, central, comp=np.greater_equal)
-
-        if self.order == 'product':
-            dominated_s = lt_s
-            non_comparable_s = points - dominated_s - ge_s
-            codes_s = non_comparable_s + dominated_s*(2*points + 3 - dominated_s)//2
+            non_comp_s = points - dominated_s - ge_s
+            codes_s = non_comp_s + dominated_s*(2*points + 3 - dominated_s)//2
         else:
             codes_s = lt_s
 
@@ -798,12 +711,12 @@ class CompletedLocalBinaryCountSMC(HEP):
             neighbour = utils.subimage(img, pixel, radius)
             m_map += np.abs(np.float_(neighbour) - central)
         m_map /= points
+       
         if m_map.ndim > 2:
             mp_avg = np.array([*map(np.mean, tuple(m_map.T))])
             mp_avg = np.tile(mp_avg, m_map.shape[:2] + (1,))
         else:
-            mp_avg = np.mean(m_map)
-            mp_avg = np.tile(mp_avg, m_map.shape[:2])
+            mp_avg = np.full(central.shape, np.mean(m_map))
 
         if self.order in ('bitmixing', 'random'):
             # Mean and median values need to be cast to integer in order to
@@ -811,7 +724,6 @@ class CompletedLocalBinaryCountSMC(HEP):
             mp_avg = np.int_(mp_avg)
 
         codes_m = np.zeros(shape=central.shape[:2], dtype=np.int_)
-
         lt_m = np.zeros(shape=central.shape[:2], dtype=np.int_)
 
         if self.order == 'product':
@@ -833,18 +745,102 @@ class CompletedLocalBinaryCountSMC(HEP):
 
         if self.order == 'product':
             dominated_m = lt_m
-            non_comparable_m = points - dominated_m - ge_m
-            codes_m = non_comparable_m + dominated_m*(2*points + 3 - dominated_m)//2
+            non_comp_m = points - dominated_m - ge_m
+            codes_m = non_comp_m + dominated_m*(2*points + 3 - dominated_m)//2
         else:
             codes_m = lt_m
+
+        # Joint sign and magnitude descriptor
+        if self.order in self._canonical_orders:
+            num_codes_m = points + 1
+        elif self.order in self._product_orders:
+            num_codes_m = (points + 2)*(points + 1)//2
+        codes = num_codes_m*codes_s + codes_m
+
+        return codes
+
+
+class CompletedLocalBinaryCountSMC(CompletedLocalBinaryCountSM):
+    """Return the completed local binary count (sign, magnitude and center).
+    
+    To avoid unnecessary repetition of code this class inherits most 
+    of its behaviour from `CompletedLocalBinaryCountSM`.
+    
+    Examples
+    --------
+    >>> smc = CompletedLocalBinaryCountSMC(order='linear', radius=[1, 2, 3])
+    >>> smc.dims
+    [162, 578, 1250]
+    >>> gray = np.array([[ 25, 33,  80,  94],
+    ...                  [141, 25, 175, 120],
+    ...                  [ 15, 17,  12, 203]], dtype=np.uint8)
+    ...
+    >>> smc.codemap(gray, 1, 8)
+    array([[ 66, 131]])
+    >>> smcp = CompletedLocalBinaryCountSMC(order='product', radius=[1, 2, 3])
+    >>> smcp.dims
+    [6075, 70227, 316875]
+    >>> rgb = np.array([[[134,  98, 245],
+    ...                  [242, 123, 232],
+    ...                  [246,  98, 117],
+    ...                  [228, 164,  54]],
+    ...                 [[126,  75, 165],
+    ...                  [227, 241, 145],
+    ...                  [160,  38,  32],
+    ...                  [ 47,  10, 185]],
+    ...                 [[142, 246,  83],
+    ...                  [ 69, 153, 234],
+    ...                  [ 10, 118,  24],
+    ...                  [114,  94,  30]]], dtype=np.uint8)
+    >>> smcp.codemap(rgb, 1, 8)
+    array([[3148,  609]])
+
+    References
+    ----------
+    .. [1] Yang Zhao, De-Shuang Huang, and Wei Jia
+           Completed Local Binary Count for Rotation Invariant Texture
+           Classification
+           https://doi.org/10.1109/TIP.2012.2204271
+
+    """
+    def compute_dims(self, points):
+        """Compute the dimension of the histogram for each neighbourhood."""
+        if self.order in self._canonical_orders:
+            return [2*(p + 1)**2 for p in self.points]
+        elif self.order in self._product_orders:
+            return [3*((p + 2)*(p + 1)//2)**2 for p in self.points]
+        else:
+            self.raise_order_not_supported()
+
+
+    def codemap(self, img, radius, points):
+        """Return a map with the pattern codes of an image corresponding
+        to the local concave and convex micro-structure patterns coding.
+
+        Parameters
+        ----------
+        img : array
+            Color image.
+        radius : int
+            Radius of the local neighborhood.
+        points : int
+            Number of pixels of the local neighborhood.
+
+        Returns
+        -------
+        codes : array
+            Map of feature values.
+            
+        """
+        central = img[radius: -radius, radius: -radius]
 
         # Center descriptor
         if central.ndim > 2:
             c_i = np.array([*map(np.mean, tuple(central.T))])
             c_i = np.tile(c_i, central.shape[:2] + (1,))
         else:
-            c_i = np.mean(central)
-            c_i = np.tile(c_i, central.shape[:2])
+            c_i = np.full(central.shape, np.mean(central))
+
         if self.order in ('bitmixing', 'random'):
         # Mean and median values need to be cast to integer in order to
         # be used as indices in the lut
@@ -853,34 +849,36 @@ class CompletedLocalBinaryCountSMC(HEP):
         ge_c = self.compare(central, c_i, comp=np.greater_equal)
         if self.order == 'product':
             lt_c = self.compare(central, c_i, comp=np.less)
-            # 3 possibilities: central < average (0)
-            #                  central >= average (1)
-            #                  central not comparable to average (2)
-            codes_c = 2 * np.ones(shape=central.shape[:2], dtype=np.int_)
+            # 3 possibilities: central < average -> 0
+            #                  central >= average -> 1
+            #                  central not comparable to average -> 2
+            codes_c = np.full(central.shape[:2], fill_value=2, dtype=np.int_)
             codes_c[ge_c] = 1
             codes_c[lt_c] = 0
         else:
             codes_c = ge_c
 
-        if self.order in ('linear', 'lexicographic', 'alphamod',
-                          'bitmixing', 'refcolor', 'random'):
-            n_m = points + 1
-            n_c = 2
-        elif self.order == 'product':
-            n_m = (points + 2)*(points + 1)//2
-            n_c = 3
-        codes = codes_c + n_c*(codes_m + n_m*codes_s)
+        codes_sm = super(CompletedLocalBinaryCountSMC, self).codemap(img, radius, points)
+
+        if self.order in self._canonical_orders:
+            num_codes_c = 2
+        elif self.order in self._product_orders:
+            num_codes_c = 3
+
+        codes = codes_c + num_codes_c*codes_sm
+        
         return codes
 
 
 class ImprovedCenterSymmetricLocalBinaryPattern(HEP):
-    """Return the improved center-symmetric local bonary patterns features.
+    """Return the improved center-symmetric local binary patterns features.
 
     References
     ----------
     .. [1] Xiaosheng Wu and Junding Sun
            An Effective Texture Spectrum Descriptor
            https://doi.org/10.1109/IAS.2009.126
+           
     """
 
 
@@ -1153,6 +1151,33 @@ class LocalConcaveConvexMicroStructurePatterns(HEP):
 class LocalDirectionalRankCoding(HEP):
     """Return the local directional rank coding.
 
+    Examples
+    --------
+    >>> dlin = LocalDirectionalRankCoding(order='linear', radius=[1, 2, 3])
+    >>> dlin.dims
+    [81, 6561, 531441]
+    >>> gray = np.array([[25, 33, 10],
+    ...                  [53, 25, 75],
+    ...                  [15, 17, 12]])
+    ...
+    >>> dlin.codemap(gray, radius=1, points=8)
+    array([[42]])
+    >>> dp = LocalDirectionalRankCoding(order='product', radius=[1, 2, 3])
+    >>> dp.dims
+    [256, 65536, 16777216]
+    >>> rgb = np.array([[[102, 220, 225],
+    ...                  [ 95, 179,  61],
+    ...                  [234, 203,  92]],
+    ...                 [[  3,  98, 243],
+    ...                  [ 14, 149, 245],
+    ...                  [ 46, 186, 250]],
+    ...                 [[ 99, 187,  71],
+    ...                  [212, 153, 199],
+    ...                  [188, 174,  65]]])
+    ...
+    >>> dp.codemap(rgb, radius=1, points=8)
+    array([[253]])
+        
     References
     ----------
     .. [1] Farida Ouslimani, Achour Ouslimani and Zohra Ameur
@@ -1168,7 +1193,7 @@ class LocalDirectionalRankCoding(HEP):
         elif self.order == 'product':
             return [4**(p//2) for p in self.points]
         else:
-            self.print_order_not_supported()
+            self.raise_order_not_supported()
 
 
     def codemap(self, img, radius, points):
@@ -1189,33 +1214,6 @@ class LocalDirectionalRankCoding(HEP):
         codes : array
             Map of feature values.
 
-        Examples
-        --------
-        >>> dlin = LocalDirectionalRankCoding(order='linear', radius=[1, 2, 3])
-        >>> dlin.dims
-        [81, 6561, 531441]
-        >>> gray = np.array([[25, 33, 10],
-        ...                  [53, 25, 75],
-        ...                  [15, 17, 12]])
-        ...
-        >>> dlin.codemap(gray, radius=1, points=8)
-        array([[42]])
-        >>> dp = LocalDirectionalRankCoding(order='product', radius=[1, 2, 3])
-        >>> dp.dims
-        [256, 65536, 16777216]
-        >>> rgb = np.array([[[102, 220, 225],
-        ...                  [ 95, 179,  61],
-        ...                  [234, 203,  92]],
-        ...                 [[  3,  98, 243],
-        ...                  [ 14, 149, 245],
-        ...                  [ 46, 186, 250]],
-        ...                 [[ 99, 187,  71],
-        ...                  [212, 153, 199],
-        ...                  [188, 174,  65]]])
-        ...
-        >>> dp.codemap(rgb, radius=1, points=8)
-        array([[253]])
-        
         """
         central = img[radius: -radius, radius: -radius]
         codes = np.zeros(shape=central.shape[:2], dtype=np.int_)
@@ -1275,13 +1273,12 @@ class RankTransform(HEP):
     """
     def compute_dims(self, points):
         """Compute the dimension of the histogram for each neighbourhood."""
-        if self.order in ('linear', 'lexicographic', 'alphamod',
-                          'bitmixing', 'refcolor', 'random'):
+        if self.order in self._canonical_orders:
             return [p + 1 for p in self.points]
-        elif self.order == 'product':
+        elif self.order in self._product_orders:
             return [(p + 2)*(p + 1)//2 for p in self.points]
         else:
-            self.print_order_not_supported()
+            self.raise_order_not_supported()
 
 
     def codemap(self, img, radius, points):
