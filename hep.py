@@ -252,13 +252,13 @@ class HEP(object):
                 'random':
                     Order based on a random permutation of the
                     lexicographic order.
-        radius : list of int, default is [1]
+        radius : list of int, optional (default is [1])
             Radii of the local neighborhoods.
-        bands : str, default is 'RGB'
+        bands : str, optional (default is 'RGB')
             Color band priorities.
-        cref : list of int, default is [0, 0, 0]
+        cref : list of int, optional (default is [0, 0, 0])
             RGB coordinates of the reference color.
-        seed : int, default is 0
+        seed : int, optional (default is 0)
             Seed for the pseudo-random number generator.
 
         """
@@ -477,44 +477,52 @@ class HEP(object):
         ...                  [4, 1, 0]])
         ...
         >>> d_lin = RankTransform(order='linear')
-        >>> np.testing.assert_array_equal(d_lin.compare(i1, i2, np.less_equal),
-        ...                               [[ True,  True, False],
-        ...                                [ True, False, False]])
+        >>> d_lin.compare(i1, i2, np.less_equal)
+        array([[ True,  True, False],
+               [ True, False, False]])
+        >>> a1 = np.array([[[0, 1, 2], 
+        ...                 [0, 1, 2]],
+        ...                [[3, 4, 5], 
+        ...                 [3, 4, 5]]])
         ...
-        >>> a1 = np.asarray([[[0, 1, 2], [0, 1, 2]],
-        ...                  [[3, 4, 5], [3, 4, 5]]])
-        ...
-        >>> a2 = np.asarray([[[2, 2, 2], [3, 3, 3]],
-        ...                  [[3, 3, 3], [2, 2, 2]]])
+        >>> a2 = np.asarray([[[2, 2, 2], 
+        ...                   [3, 3, 3]], 
+        ...                  [[3, 3, 3], 
+        ...                   [2, 2, 2]]])
         ...
         >>> d_prod = RankTransform(order='product')
-        >>> np.testing.assert_array_equal(d_prod.compare(a1, a2, np.greater),
-        ...                               [[False, False],
-        ...                                [False,  True]])
+        >>> d_prod.compare(a1, a2, np.greater)
+        array([[False, False],
+               [False,  True]])
+        >>> b1 = np.array([[[0, 1, 2], 
+        ...                 [0, 1, 2], 
+        ...                 [1, 2, 1]],
+        ...                [[3, 4, 5], 
+        ...                 [6, 7, 8],
+        ...                 [2, 3, 3]]])
         ...
-        >>> b1 = np.asarray([[[0, 1, 2], [0, 1, 2]],
-        ...                  [[3, 4, 5], [6, 7, 8]]])
-        ...
-        >>> b2 = np.asarray([[[2, 0, 1], [0, 1, 2]],
-        ...                  [[4, 5, 6], [8, 8, 8]]])
+        >>> b2 = np.array([[[2, 0, 1], 
+        ...                 [0, 1, 2], 
+        ...                 [0, 1, 2]],
+        ...                [[4, 5, 6], 
+        ...                 [8, 8, 8],
+        ...                 [2, 3, 4]]])
         ...
         >>> d_lexrgb = RankTransform(order='lexicographic', bands='RBG')
-        >>> np.testing.assert_array_equal(d_lexrgb.compare(b1, b2),
-        ...                               [[ True, False],
-        ...                                [ True,  True]])
-        ...
+        >>> d_lexrgb.compare(b1, b2)
+        array([[ True, False, False],
+               [ True,  True,  True]])
         >>> d_lexbgr = RankTransform(order='lexicographic', bands='BGR')
-        >>> np.testing.assert_array_equal(d_lexbgr.compare(b1, b2, np.greater),
-        ...                               [[ True, False],
-        ...                                [False, False]])
+        >>> d_lexbgr.compare(b1, b2, np.greater)
+        array([[ True, False, False],
+               [False, False, False]])
+        >>> c1 = np.array([[[0b00000001, 0b00000010, 0b00000100]],
+        ...                [[0b11110000, 0b00111100, 0b00001111]],
+        ...                [[0b10000000, 0b11000000, 0b11100000]]])
         ...
-        >>> c1 = np.asarray([[[0b00000001, 0b00000010, 0b00000100]],
-        ...                  [[0b11110000, 0b00111100, 0b00001111]],
-        ...                  [[0b10000000, 0b11000000, 0b11100000]]])
-        ...
-        >>> c2 = np.asarray([[[0b00000001, 0b00000011, 0b00000111]],
-        ...                  [[0b11110000, 0b00111100, 0b00001111]],
-        ...                  [[0b10000000, 0b10000000, 0b10000000]]])
+        >>> c2 = np.array([[[0b00000001, 0b00000011, 0b00000111]],
+        ...                [[0b11110000, 0b00111100, 0b00001111]],
+        ...                [[0b10000000, 0b10000000, 0b10000000]]])
         ...
         >>> d_mixrgb = RankTransform(order='bitmixing', bands='RGB')
         >>> d_mixrgb.compare(c1, c2, np.less)
@@ -530,11 +538,15 @@ class HEP(object):
         array([[ True],
                [False],
                [False]])
-        >>> z1 = np.asarray([[[0, 0, 1], [0, 3, 4]],
-        ...                  [[3, 4, 0], [1, 1, 1]]])
+        >>> z1 = np.array([[[0, 0, 1], 
+        ...                 [0, 3, 4]],
+        ...                [[3, 4, 0], 
+        ...                 [1, 1, 1]]])
         ...
-        >>> z2 = np.asarray([[[0, 0, 1], [5, 0, 0]],
-        ...                  [[1, 1, 1], [0, 3, 0]]])
+        >>> z2 = np.array([[[0, 0, 1], 
+        ...                 [5, 0, 0]],
+        ...                [[1, 1, 1], 
+        ...                 [0, 3, 0]]])
         ...
         >>> d_ref0 = RankTransform(order='refcolor', cref=[0, 0, 0])
         >>> d_ref0.compare(z1, z2, np.less)
@@ -551,13 +563,17 @@ class HEP(object):
         array([[ True, False],
                [False, False]])
         >>> d_alpha4 = RankTransform(order='alphamod', alpha=4)
-        >>> y1 = np.asarray([[[20, 10, 13], [43, 90, 51]],
-        ...                  [[55, 20, 60], [56, 20, 60]]])
+        >>> x1 = np.array([[[20, 10, 13], 
+        ...                 [43, 90, 51]],
+        ...                  [[55, 20, 60], 
+        ...                   [56, 20, 60]]])
         ...
-        >>> y2 = np.asarray([[[21, 10, 13], [42, 90, 50]],
-        ...                  [[53, 20, 60], [53, 20, 60]]])
+        >>> x2 = np.array([[[21, 10, 13], 
+        ...                 [42, 90, 50]],
+        ...                [[53, 20, 60], 
+        ...                 [53, 20, 60]]])
         ...
-        >>> d_alpha4.compare(y1, y2, comp=np.less_equal)
+        >>> d_alpha4.compare(x1, x2, comp=np.less_equal)
         array([[ True, False],
                [ True, False]])
 
@@ -599,14 +615,11 @@ class HEP(object):
 
 class Concatenation(object):
     """Class for concatenation of HEP descriptors."""
-
     def __init__(self, *descriptors):
         self.descriptors = descriptors
 
-
     def __call__(self, img):
         return np.concatenate([d(img) for d in self.descriptors])
-
 
     def __str__(self):
         return '+'.join([d.__str__() for d in self.descriptors])
@@ -641,6 +654,7 @@ class CompletedLocalBinaryCountSM(HEP):
     ...                  [ 69, 153, 234],
     ...                  [ 10, 118,  24],
     ...                  [114,  94,  30]]], dtype=np.uint8)
+    ...
     >>> smprod.codemap(rgb, 1, 8)
     array([[1049,  203]])
     
@@ -792,6 +806,7 @@ class CompletedLocalBinaryCountSMC(CompletedLocalBinaryCountSM):
     ...                  [ 69, 153, 234],
     ...                  [ 10, 118,  24],
     ...                  [114,  94,  30]]], dtype=np.uint8)
+    ...
     >>> smcp.codemap(rgb, 1, 8)
     array([[3148,  609]])
 
@@ -858,7 +873,7 @@ class CompletedLocalBinaryCountSMC(CompletedLocalBinaryCountSM):
         else:
             codes_c = ge_c
 
-        codes_sm = super(CompletedLocalBinaryCountSMC, self).codemap(img, radius, points)
+        codes_sm = super().codemap(img, radius, points)
 
         if self.order in self._canonical_orders:
             num_codes_c = 2
@@ -873,6 +888,45 @@ class CompletedLocalBinaryCountSMC(CompletedLocalBinaryCountSM):
 class ImprovedCenterSymmetricLocalBinaryPattern(HEP):
     """Return the improved center-symmetric local binary patterns features.
 
+    Examples
+    --------
+    >>> params_lin = dict(order='linear', radius=[1, 2, 3])
+    >>> icslin = ImprovedCenterSymmetricLocalBinaryPattern(**params_lin)
+    >>> icslin.dims
+    [16, 256, 4096]
+    >>> gray = np.array([[ 25, 33,  80,  94, 114],
+    ...                  [141, 25, 175, 120,  24],
+    ...                  [ 15, 17,  12, 203, 120]], dtype=np.uint8)
+    ...
+    >>> icslin.codemap(gray, 1, 8)
+    array([[ 6,  8, 13]])
+    >>> args_lex_rgb = dict(order='lexicographic', radius=[1], bands='RGB')
+    >>> icslexrgb = ImprovedCenterSymmetricLocalBinaryPattern(**args_lex_rgb)
+    >>> rgb = np.array([[[134,  98, 245],
+    ...                  [242, 123, 232],
+    ...                  [246,  98, 117],
+    ...                  [228, 164,  54]],
+    ...                 [[126,  75, 165],
+    ...                  [227, 241, 145],
+    ...                  [160,  38,  32],
+    ...                  [ 47,  10, 185]],
+    ...                 [[142, 246,  83],
+    ...                  [ 69, 153, 234],
+    ...                  [ 10, 118,  24],
+    ...                  [114,  34,  30]]], dtype=np.uint8)
+    >>> icslexrgb.codemap(rgb, 1, 8)
+    array([[ 6, 15]])
+    >>> args_lex_bgr = dict(order='lexicographic', radius=[1], bands='BGR')
+    >>> icslexbgr = ImprovedCenterSymmetricLocalBinaryPattern(**args_lex_bgr)
+    >>> icslexbgr.codemap(rgb, 1, 8)
+    array([[ 9, 12]])
+    >>> args_prod = dict(order='product', radius=[1, 2, 3])
+    >>> icsprod = ImprovedCenterSymmetricLocalBinaryPattern(**args_prod)
+    >>> icsprod.dims
+    [16, 256, 4096]
+    >>> icsprod.codemap(rgb, 1, 8)
+    array([[0, 8]])
+
     References
     ----------
     .. [1] Xiaosheng Wu and Junding Sun
@@ -880,8 +934,6 @@ class ImprovedCenterSymmetricLocalBinaryPattern(HEP):
            https://doi.org/10.1109/IAS.2009.126
            
     """
-
-
     def compute_dims(self, points):
         """Compute the dimension of the histogram for each neighbourhood."""
         return [2**(p//2) for p in self.points]
@@ -904,6 +956,7 @@ class ImprovedCenterSymmetricLocalBinaryPattern(HEP):
         -------
         codes : array
             Map of feature values.
+            
         """
         central = img[radius: -radius, radius: -radius]
         codes = np.zeros(shape=central.shape[:2], dtype=np.int_)
@@ -913,14 +966,14 @@ class ImprovedCenterSymmetricLocalBinaryPattern(HEP):
             start = utils.subimage(img, index, radius)
             end = utils.subimage(img, index + points//2, radius)
 
-            less1 = self.compare(start, central, comp=np.less)
-            less2 = self.compare(central, end, comp=np.less)
-            greq1 = self.compare(start, central, comp=np.greater_equal)
-            greq2 = self.compare(central, end, comp=np.greater_equal)
+            ge_1 = self.compare(start, central, comp=np.greater_equal)
+            ge_2 = self.compare(central, end, comp=np.greater_equal)
+            lt_1 = self.compare(start, central, comp=np.less)
+            lt_2 = self.compare(central, end, comp=np.less)
 
-            greq = np.logical_and(greq1, greq2)
-            less = np.logical_and(less1, less2)
-            codes += np.logical_or(greq, less)*2**exponent
+            ge = np.logical_and(ge_1, ge_2)
+            lt = np.logical_and(lt_1, lt_2)
+            codes += np.logical_or(ge, lt)*2**exponent
         return codes
 
 
