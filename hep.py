@@ -480,6 +480,9 @@ class HEP(object):
         >>> d_lin.compare(i1, i2, np.less_equal)
         array([[ True,  True, False],
                [ True, False, False]])
+        >>> d_lin.compare(i1, i2, np.greater_equal)
+        array([[ True, False,  True],
+               [False,  True,  True]])
         >>> a1 = np.array([[[0, 1, 2], 
         ...                 [0, 1, 2]],
         ...                [[3, 4, 5], 
@@ -494,6 +497,9 @@ class HEP(object):
         >>> d_prod.compare(a1, a2, np.greater)
         array([[False, False],
                [False,  True]])
+        >>> d_prod.compare(a1, a2)
+        array([[False,  True],
+               [False, False]])
         >>> b1 = np.array([[[0, 1, 2], 
         ...                 [0, 1, 2], 
         ...                 [1, 2, 1]],
@@ -565,8 +571,8 @@ class HEP(object):
         >>> d_alpha4 = RankTransform(order='alphamod', alpha=4)
         >>> x1 = np.array([[[20, 10, 13], 
         ...                 [43, 90, 51]],
-        ...                  [[55, 20, 60], 
-        ...                   [56, 20, 60]]])
+        ...                [[55, 20, 60], 
+        ...                 [56, 20, 60]]])
         ...
         >>> x2 = np.array([[[21, 10, 13], 
         ...                 [42, 90, 50]],
@@ -726,11 +732,13 @@ class CompletedLocalBinaryCountSM(HEP):
             m_map += np.abs(np.float_(neighbour) - central)
         m_map /= points
        
-        if m_map.ndim > 2:
+        if m_map.ndim == 3:
             mp_avg = np.array([*map(np.mean, tuple(m_map.T))])
             mp_avg = np.tile(mp_avg, m_map.shape[:2] + (1,))
-        else:
+        elif m_map.ndim == 2:
             mp_avg = np.full(central.shape, np.mean(m_map))
+        else:
+            raise ValueError("Image has to be 2D or 3D array")
 
         if self.order in ('bitmixing', 'random'):
             # Mean and median values need to be cast to integer in order to
@@ -850,11 +858,13 @@ class CompletedLocalBinaryCountSMC(CompletedLocalBinaryCountSM):
         central = img[radius: -radius, radius: -radius]
 
         # Center descriptor
-        if central.ndim > 2:
+        if central.ndim == 3:
             c_i = np.array([*map(np.mean, tuple(central.T))])
             c_i = np.tile(c_i, central.shape[:2] + (1,))
-        else:
+        elif central.ndim == 2:
             c_i = np.full(central.shape, np.mean(central))
+        else:
+            raise ValueError("Image has to be 2D or 3D array")
 
         if self.order in ('bitmixing', 'random'):
         # Mean and median values need to be cast to integer in order to
@@ -977,23 +987,158 @@ class ImprovedCenterSymmetricLocalBinaryPattern(HEP):
         return codes
 
 
-class LocalConcaVeMicroStructurePatterns(HEP):
-    """Return the local concave micro-structure patterns.
-
+class MicroStructurePatterns(HEP):
+    """Superclass for micro structure pattern models
+    
     References
     ----------
     .. [1] Y. El merabet, Y. Ruichek
            Local Concave-and-Convex Micro-Structure Patterns for texture
            classification
            https://doi.org/10.1016/j.patcog.2017.11.005
+           
     """
-
-
     def compute_dims(self, points):
         """Compute the dimension of the histogram for each neighbourhood."""
         return [2**(p + 2) for p in self.points]
 
 
+    def codemap(self, img, radius, points, comp):
+        """Return a map with the pattern codes of an image corresponding
+        to the local concave micro-structure patterns coding.
+
+        Parameters
+        ----------
+        img : array
+            Color image.
+        radius : int
+            Radius of the local neighborhood.
+        points : int
+            Number of pixels of the local neighborhood.
+        comp : NumPy function
+            Comparison function (`np.greater_equal` or `np.less_equal`).
+
+        Returns
+        -------
+        codes : array
+            Map of feature values.
+            
+        """
+        ndims = img.ndim
+        if ndims not in (2, 3):
+            raise ValueError("Image has to be 2D or 3D array")
+
+        step = 2
+        central = img[radius: -radius, radius: -radius]
+        codes = np.zeros(shape=central.shape[:2], dtype=np.int_)
+
+        crops = [central]
+
+        for pixel in range(points):
+
+            first = utils.subimage(img, pixel, radius)
+            last = utils.subimage(img, (pixel + step) % points, radius)
+
+            crops.append(first)
+
+            comp_first = self.compare(first, central, comp)
+            comp_last = self.compare(last, central, comp)
+
+            codes += np.logical_and(comp_first, comp_last)*2**pixel
+
+        crops = np.stack(crops, axis=-1)
+       
+        # Contribution of the local statistics         
+        if ndims > 2:
+            avg_patch = np.mean(crops, axis=-1)
+            med_patch = np.median(crops, axis=-1)
+        else:
+            avg_patch = np.mean(crops, axis=-1)
+            med_patch = np.median(crops, axis=-1)
+
+        if self.order in ('bitmixing', 'random'):
+            # Mean and median values need to be cast to integer in order to
+            # be used as indices in the lut
+            avg_patch = np.int_(avg_patch)
+            med_patch = np.int_(med_patch)
+
+        comp_avg_patch = self.compare(avg_patch, central, comp)
+        comp_med_patch = self.compare(med_patch, central, comp)
+        
+        codes += np.logical_and(comp_avg_patch, comp_med_patch)*2**points
+
+        # Contribution of the global statistics
+        if ndims > 2:
+            avg_img = np.array([*map(np.mean, tuple(img.T))])
+            avg_img = np.tile(avg_img, central.shape[:2] + (1,))
+            med_img = np.array([*map(np.median, tuple(img.T))])
+            med_img = np.tile(med_img, central.shape[:2] + (1,))
+        else:
+            avg_img = np.full(central.shape, np.mean(img))
+            med_img = np.full(central.shape, np.median(img))
+        
+        if self.order in ('bitmixing', 'random'):
+            # Mean and median values need to be cast to integer in order to
+            # be used as indices in the lut
+            avg_img = np.int_(avg_img)
+            med_img = np.int_(med_img)
+
+        comp_avg_img = self.compare(avg_img, central, comp)
+        comp_med_img = self.compare(med_img, central, comp)
+        
+        codes += np.logical_and(comp_avg_img, comp_med_img)*2**(points + 1)
+
+        return codes
+
+
+class LocalConcaVeMicroStructurePatterns(MicroStructurePatterns):
+    """Return the local concave micro-structure patterns.
+
+    Examples
+    --------
+    >>> params_lin = dict(order='linear', radius=[1, 2, 3])
+    >>> lcvlin = LocalConcaVeMicroStructurePatterns(**params_lin)
+    >>> lcvlin.dims
+    [1024, 262144, 67108864]
+    >>> gray = np.array([[ 25,  33,  80,  94, 114],
+    ...                  [141,  25, 175, 120,  24],
+    ...                  [ 15,  17,  12, 203, 120],
+    ...                  [ 36, 102,  94, 186, 203]], dtype=np.uint8)
+    ...
+    >>> lcvlin.codemap(gray, 1, 8)
+    array([[ 880,    0,    1],
+           [ 938, 1023,    0]])
+    >>> args_lex_rgb = dict(order='lexicographic', radius=[1], bands='GBR')
+    >>> lcvlexgbr = LocalConcaVeMicroStructurePatterns(**args_lex_rgb)
+    >>> rgb = np.array([[[6, 5, 9],
+    ...                  [9, 6, 9],
+    ...                  [9, 4, 5],
+    ...                  [8, 7, 2]],
+    ...                 [[6, 3, 8],
+    ...                  [9, 9, 7],
+    ...                  [8, 1, 1],
+    ...                  [2, 0, 9]],
+    ...                 [[7, 9, 4],
+    ...                  [2, 6, 9],
+    ...                  [0, 5, 1],
+    ...                  [5, 1, 1]], 
+    ...                 [[4, 5, 6],
+    ...                  [3, 0, 0],
+    ...                  [6, 3, 4],
+    ...                  [1, 2, 7]]], dtype=np.uint8)
+    ...
+    >>> lcvlexgbr.codemap(rgb, 1, 8)
+    array([[  0, 993],
+           [ 64,   0]])
+    >>> args_prod = dict(order='product', radius=[1, 2, 3])
+    >>> lcvprod = LocalConcaVeMicroStructurePatterns(**args_prod)
+    >>> lcvprod.dims
+    [1024, 262144, 67108864]
+    >>> lcvprod.codemap(rgb, 1, 8)
+    array([[ 0, 96],
+           [ 0,  0]])
+
+    """
     def codemap(self, img, radius, points):
         """Return a map with the pattern codes of an image corresponding
         to the local concave micro-structure patterns coding.
@@ -1011,43 +1156,19 @@ class LocalConcaVeMicroStructurePatterns(HEP):
         -------
         codes : array
             Map of feature values.
+            
         """
-        central = img[radius: -radius, radius: -radius]
-        codes = np.zeros(shape=central.shape[:2], dtype=np.int_)
-
-        for pixel in range(points):
-
-            first = utils.subimage(img, pixel, radius)
-            last = utils.subimage(img, (pixel + 2)% points, radius)
-
-            ge_first = self.compare(first, central, np.greater_equal)
-            ge_last = self.compare(last, central, np.greater_equal)
-
-            codes += np.logical_and(ge_first, ge_last)*2**pixel
-
-        return codes
+        return super().codemap(img, radius, points, comp=np.greater_equal)
 
 
-class LocalConveXMicroStructurePatterns(HEP):
+class LocalConveXMicroStructurePatterns(MicroStructurePatterns):
     """Return the local convex micro-structure patterns.
+!!! seguir aquí
 
-    References
-    ----------
-    .. [1] Y. El merabet, Y. Ruichek
-           Local Concave-and-Convex Micro-Structure Patterns for texture
-           classification
-           https://doi.org/10.1016/j.patcog.2017.11.005
     """
-
-
-    def compute_dims(self, points):
-        """Compute the dimension of the histogram for each neighbourhood."""
-        return [2**(p + 2) for p in self.points]
-
-
     def codemap(self, img, radius, points):
         """Return a map with the pattern codes of an image corresponding
-        to the local convex micro-structure patterns coding.
+        to the local concave micro-structure patterns coding.
 
         Parameters
         ----------
@@ -1062,143 +1183,64 @@ class LocalConveXMicroStructurePatterns(HEP):
         -------
         codes : array
             Map of feature values.
+            
         """
-        central = img[radius: -radius, radius: -radius]
-        codes = np.zeros(shape=central.shape[:2], dtype=np.int_)
-
-        for pixel in range(points):
-
-            first = utils.subimage(img, pixel, radius)
-            last = utils.subimage(img, (pixel + 2)% points, radius)
-
-            le_first = self.compare(first, central, np.less_equal)
-            le_last = self.compare(last, central, np.less_equal)
-
-            codes += np.logical_and(le_first, le_last)*2**pixel
-
-        return codes
+        return super().codemap(img, radius, points, comp=np.less_equal)
 
 
-class LocalConcaveConvexMicroStructurePatterns(HEP):
+class LocalConcaveConvexMicroStructurePatterns(MicroStructurePatterns):
     """Return the local concave and convex micro-structure patterns.
 
-    References
-    ----------
-    .. [1] Y. El merabet, Y. Ruichek
-           Local Concave-and-Convex Micro-Structure Patterns for texture
-           classification
-           https://doi.org/10.1016/j.patcog.2017.11.005
+    Examples
+    --------
+    >>> params_prod = dict(order='product', radius=[1])
+    >>> lcc_prod = LocalConcaveConvexMicroStructurePatterns(**params_prod)
+    >>> lcc_prod.dims
+    [2048]
+    >>> lcv_prod = LocalConcaVeMicroStructurePatterns(**params_prod)
+    >>> lcx_prod = LocalConveXMicroStructurePatterns(**params_prod)
+    >>> img = np.random.randint(0, high=256, size=(60, 80, 3), dtype=np.uint8)
+    >>> hv_prod = lcv_prod(img)
+    >>> hx_prod = lcx_prod(img)
+    >>> hc_prod = lcc_prod(img)
+    >>> np.array_equal(hc_prod, np.concatenate([hv_prod, hx_prod]))
+    True
+    >>> params_mix = dict(order='bitmixing', radius=[1], bands='BGR')
+    >>> lcc_mix = LocalConcaveConvexMicroStructurePatterns(**params_mix)
+    >>> lcv_mix = LocalConcaVeMicroStructurePatterns(**params_mix)
+    >>> lcx_mix = LocalConveXMicroStructurePatterns(**params_mix)
+    >>> hv_mix = lcv_mix(img)
+    >>> hx_mix = lcx_mix(img)
+    >>> hc_mix = lcc_mix(img)
+    >>> np.array_equal(hc_mix, np.concatenate([hv_mix, hx_mix]))
+    True
+
     """
-
-
     def compute_dims(self, points):
         """Compute the dimension of the histogram for each neighbourhood."""
         return [2*2**(p + 2) for p in self.points]
 
 
-    def codemap(self, img, radius, points):
-        """Return a map with the pattern codes of an image corresponding
-        to the local concave and convex micro-structure patterns coding.
+    def __call__(self, img):
+        """Compute the feature vector of an image through a HEP descriptor.
 
         Parameters
         ----------
         img : array
-            Color image.
-        radius : int
-            Radius of the local neighborhood.
-        points : int
-            Number of pixels of the local neighborhood.
+            Input image.
 
         Returns
         -------
-        codes : array
-            Map of feature values.
+        hist : array
+            Feature vector (histogram of equivalent patterns).
+            
         """
-        step = 2
-
-        central = img[radius: -radius, radius: -radius]
-
-        if img.ndim == 3:
-            global_mean = np.asarray([*map(np.mean, img.T)])
-            global_median = np.asarray([*map(np.median, img.T)])
-        elif img.ndim == 2:
-            global_mean = np.mean(img)
-            global_median = np.median(img)
-        else:
-            raise ValueError("Image has to be 2D or 3D array")
-
-        global_mean = np.zeros(shape=central.shape) + global_mean
-        global_median = np.zeros(shape=central.shape) + global_median
-
-        lst = [utils.subimage(img, pixel, radius) for pixel in range(points)]
-        lst.append(central)
-        neighbours = np.stack(lst, axis=-1)
-        local_mean = np.mean(neighbours, axis=-1)
-        local_median = np.median(neighbours, axis=-1)
-
-        if self.order in ('bitmixing', 'random'):
-            # Mean and median values need to be cast to integer in order to
-            # be used as indices in the lut
-            local_mean = np.int_(local_mean)
-            local_median = np.int_(local_median)
-            global_mean = np.int_(global_mean)
-            global_median = np.int_(global_median)
-
-        codes_concave = np.zeros(shape=central.shape[:2], dtype=np.int_)
-        codes_convex = np.zeros(shape=central.shape[:2], dtype=np.int_)
-
-        for pixel in range(points)[::-1]:
-
-            first = utils.subimage(img, pixel, radius)
-            last = utils.subimage(img, (pixel - step) % points, radius)
-
-            ge_first = self.compare(first, central, np.greater_equal)
-            ge_last = self.compare(last, central, np.greater_equal)
-            le_first = self.compare(first, central, np.less_equal)
-            le_last = self.compare(last, central, np.less_equal)
-
-#            ge_first = d1.compare(first, central, np.greater_equal)
-#            ge_last = d1.compare(last, central, np.greater_equal)
-#            le_first = d1.compare(first, central, np.less_equal)
-#            le_last = d1.compare(last, central, np.less_equal)
-
-#            ge_first = np.greater_equal(first, central)
-#            ge_last = np.greater_equal(last, central)
-#            le_first = np.less_equal(first, central)
-#            le_last = np.less_equal(last, central)
-
-            codes_concave += np.logical_and(ge_first, ge_last)*2**pixel
-            codes_convex += np.logical_and(le_first, le_last)*2**pixel
-
-        ge_first = self.compare(local_mean, central, np.greater_equal)
-        ge_last = self.compare(local_median, central, np.greater_equal)
-        le_first = self.compare(local_mean, central, np.less_equal)
-        le_last = self.compare(local_median, central, np.less_equal)
-
-#        ge_first = d1.compare(local_mean, central, np.greater_equal)
-#        ge_last = d1.compare(local_median, central, np.greater_equal)
-#        le_first = d1.compare(local_mean, central, np.less_equal)
-#        le_last = d1.compare(local_median, central, np.less_equal)
-
-        codes_concave += np.logical_and(ge_first, ge_last)*2**points
-        codes_convex += np.logical_and(le_first, le_last)*2**points
-
-        ge_first = self.compare(global_mean, central, np.greater_equal)
-        ge_last = self.compare(global_median, central, np.greater_equal)
-        le_first = self.compare(global_mean, central, np.less_equal)
-        le_last = self.compare(global_median, central, np.less_equal)
-
-#        ge_first = np.greater_equal(global_mean, central)
-#        ge_last = np.greater_equal(global_median, central)
-#        le_first = np.less_equal(global_mean, central)
-#        le_last = np.less_equal(global_median, central)
-
-        codes_concave += np.logical_and(ge_first, ge_last)*2**(points + 1)
-        codes_convex += np.logical_and(le_first, le_last)*2**(points + 1)
-
-        codes = np.hstack([codes_concave, codes_convex + 2**(points + 2)])
-
-        return codes
+        params = {k: v for k, v in self.__dict__.items()}
+        descr_concave = LocalConcaVeMicroStructurePatterns(**params)
+        descr_convex = LocalConveXMicroStructurePatterns(**params)
+        hist_concave = descr_concave(img)
+        hist_convex = descr_convex(img)
+        return np.concatenate([hist_concave, hist_convex])
 
 
 class LocalDirectionalRankCoding(HEP):
@@ -1273,23 +1315,23 @@ class LocalDirectionalRankCoding(HEP):
 
         for exponent, index in enumerate(range(points//2)):
             rank = np.zeros_like(codes)
-            less = np.zeros_like(codes)
+            lt = np.zeros_like(codes)
 
             if self.order == 'product':
-                greq = np.zeros_like(codes)
+                ge = np.zeros_like(codes)
 
             for pixel in [index, index + points//2]:
                 neighbour = utils.subimage(img, pixel, radius)
-                less += self.compare(neighbour, central, np.less)
+                lt += self.compare(neighbour, central, np.less)
 
                 if self.order == 'product':
-                    greq += self.compare(neighbour, central, np.greater_equal)
+                    ge += self.compare(neighbour, central, np.greater_equal)
 
             if self.order == 'product':
-                rank = np.where(less + greq < 2, 3, less)
+                rank = np.where(lt + ge < 2, 3, lt)
                 codes += rank*4**exponent
             else:
-                rank = less
+                rank = lt
                 codes += rank*3**exponent
 
         return codes
@@ -1354,24 +1396,24 @@ class RankTransform(HEP):
             
         """
         central = img[radius: -radius, radius: -radius]
-        less = np.zeros(shape=central.shape[:2], dtype=np.int_)
+        lt = np.zeros(shape=central.shape[:2], dtype=np.int_)
 
         if self.order == 'product':
-            greq = np.zeros_like(less)
+            ge = np.zeros_like(lt)
 
         for pixel in range(points):
             neighbour = utils.subimage(img, pixel, radius)
-            less += self.compare(neighbour, central, comp=np.less)
+            lt += self.compare(neighbour, central, comp=np.less)
 
             if self.order == 'product':
-                greq += self.compare(neighbour, central, comp=np.greater_equal)
+                ge += self.compare(neighbour, central, comp=np.greater_equal)
 
         if self.order == 'product':
-            dominated = less
-            non_comparable = points - dominated - greq
+            dominated = lt
+            non_comparable = points - dominated - ge
             codes = non_comparable + dominated*(2*points + 3 - dominated)//2
         else:
-            codes = less
+            codes = lt
 
         return codes
 
