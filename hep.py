@@ -1108,8 +1108,8 @@ class LocalConcaVeMicroStructurePatterns(MicroStructurePatterns):
     >>> lcvlin.codemap(gray, 1, 8)
     array([[ 880,    0,    1],
            [ 938, 1023,    0]])
-    >>> args_lex_rgb = dict(order='lexicographic', radius=[1], bands='GBR')
-    >>> lcvlexgbr = LocalConcaVeMicroStructurePatterns(**args_lex_rgb)
+    >>> args_lex_gbr = dict(order='lexicographic', radius=[1], bands='GBR')
+    >>> lcvlexgbr = LocalConcaVeMicroStructurePatterns(**args_lex_gbr)
     >>> rgb = np.array([[[6, 5, 9],
     ...                  [9, 6, 9],
     ...                  [9, 4, 5],
@@ -1163,7 +1163,50 @@ class LocalConcaVeMicroStructurePatterns(MicroStructurePatterns):
 
 class LocalConveXMicroStructurePatterns(MicroStructurePatterns):
     """Return the local convex micro-structure patterns.
-!!! seguir aquí
+
+    Examples
+    --------
+    >>> params_lin = dict(order='linear', radius=[1, 2, 3])
+    >>> lcxlin = LocalConveXMicroStructurePatterns(**params_lin)
+    >>> lcxlin.dims
+    [1024, 262144, 67108864]
+    >>> gray = np.array([[ 25,  33,  80,  94, 114],
+    ...                  [141,  25, 175, 120,  24],
+    ...                  [ 15,  17,  12, 203, 120],
+    ...                  [ 36, 102,  94, 186, 203]], dtype=np.uint8)
+    ...
+    >>> lcxlin.codemap(gray, 1, 8)
+    array([[ 130, 1013,  954],
+           [   0,    0, 1023]])
+    >>> args_lex_gbr = dict(order='lexicographic', radius=[1], bands='GBR')
+    >>> lcxlexgbr = LocalConveXMicroStructurePatterns(**args_lex_gbr)
+    >>> rgb = np.array([[[6, 5, 9],
+    ...                  [9, 6, 9],
+    ...                  [9, 4, 5],
+    ...                  [8, 7, 2]],
+    ...                 [[6, 3, 8],
+    ...                  [9, 9, 7],
+    ...                  [8, 1, 1],
+    ...                  [2, 0, 9]],
+    ...                 [[7, 9, 4],
+    ...                  [2, 6, 9],
+    ...                  [0, 5, 1],
+    ...                  [5, 1, 1]], 
+    ...                 [[4, 5, 6],
+    ...                  [3, 0, 0],
+    ...                  [6, 3, 4],
+    ...                  [1, 2, 7]]], dtype=np.uint8)
+    ...
+    >>> lcxlexgbr.codemap(rgb, 1, 8)
+    array([[1023,    0],
+           [ 942,  798]])
+    >>> args_prod = dict(order='product', radius=[1, 2, 3])
+    >>> lcxprod = LocalConveXMicroStructurePatterns(**args_prod)
+    >>> lcxprod.dims
+    [1024, 262144, 67108864]
+    >>> lcxprod.codemap(rgb, 1, 8)
+    array([[778,   0],
+           [  0,   0]])
 
     """
     def codemap(self, img, radius, points):

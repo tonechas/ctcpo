@@ -8,6 +8,11 @@ import imghdr
 import numpy as np
 
 
+####################
+# Helper functions #
+####################
+
+
 def find_images(dirpath):
     """Recursively detect image files contained in a folder.
 
@@ -35,6 +40,11 @@ def find_images(dirpath):
     return imgfiles
 
 
+###########
+# Classes #
+###########
+
+    
 class TextureDataset(object):
     """Superclass for texture datasets."""
 
@@ -216,7 +226,7 @@ class ForestMicro(TextureDataset):
     .. [1] https://bit.ly/2Y6pUIo
     """
     def __init__(self, dirpath):
-        super(ForestMicro, self).__init__(dirpath)
+        super().__init__(dirpath)
         self.acronym = 'ForestMicro'
 
 
@@ -225,6 +235,228 @@ class ForestMicro(TextureDataset):
         head, _ = os.path.split(img)
         _, tail = os.path.split(head)
         return tail
+
+
+class Kather(TextureDataset):
+    """Class for Kather dataset.
+
+    Notes
+    -----
+    Kather consists of 5,000 histological images of human colorectal cancer
+    including 8 different types of tissue (625 samples per class).
+
+    Image format : .tif (RGB)
+    Sample size : 150x150 px
+
+    Sample file name : 01_TUMOR/1A11_CRC-Prim-HE-07_022.tif_Row_601_Col_151.tif
+        class : 01_TUMOR
+
+    Examples
+    --------
+    >>> import config
+    >>> kat = Kather(os.path.join(config.imgs, 'Kather'))
+    >>> kat.acronym
+    'Kather'
+    >>> len(kat.classes)
+    8
+    >>> len(kat.images)
+    5000
+    >>> n = 0
+    >>> _, imgname = os.path.split(kat.images[n])
+    >>> imgname
+    '10009_CRC-Prim-HE-03_009.tif_Row_301_Col_151.tif'
+    >>> kat.get_class(kat.images[n])
+    '01_TUMOR'
+    
+    References
+    ----------
+    .. [1] Multi-class texture analysis in colorectal cancer histology
+           Jakob Nikolas Kather, Cleo-Aron Weis, Francesco Bianconi,
+           Susanne M. Melchers, Lothar R. Schad, Timo Gaiser, Alexander Marx
+           and Frank Gerrit Zöllner
+           https://www.nature.com/articles/srep27988
+           
+    """
+    def __init__(self, dirpath):
+        super().__init__(dirpath)
+        self.acronym = 'Kather'
+        
+
+    def get_class(self, img):
+        """Extract the class label from the given image file name."""
+        head, _ = os.path.split(img)
+        _, tail = os.path.split(head)
+        return tail
+
+
+class KTHTIPS2b(TextureDataset):
+    """Class for KTH-TIPS-2b dataset.
+
+    The KTH-TIPS-2b dataset contains 11 types of materials such as bread,
+    cotton, alluminium foil, etc. There are 4 samples per class. Each
+    material sample was acquired under 9 different scales, 3 viewpoints
+    and 4 illumination directions. As a result there are 432 samples
+    per class (4752 samples in total).
+
+    Image format : .png (RGB)
+    Sample size : 85-299 x  71-291 px (range of nrows x range of ncols)
+                  147x75 - 299x139 px (range of number of pixels)
+
+    Sample file name : aluminium_foil/sample_d/15d-scale_2_im_1_col.png
+        class : aluminium_foil
+        corresponding CURET sample number: 15
+        sample : d
+        scale number : 2
+        image number : 1 =>
+            object pose : frontal
+            illumination direction: frontal
+
+    Examples
+    --------
+    >>> import config
+    >>> kth = KTHTIPS2b(os.path.join(config.imgs, 'KTHTIPS2b'))
+    >>> kth.acronym
+    'KTH2b'
+    >>> len(kth.classes)
+    11
+    >>> len(kth.images)
+    4752
+    >>> n = 0
+    >>> _, imgname = os.path.split(kth.images[n])
+    >>> imgname
+    '15a-scale_10_im_10_col.png'
+    >>> kth.get_class(kth.images[n])
+    'aluminium_foil'
+    >>> kth.get_scale(kth.images[n])
+    10
+    >>> kth.get_viewpoint(kth.images[n])
+    'Frontal'
+    >>> kth.get_illumination(kth.images[n])
+    'Ambient'
+
+    References
+    ----------
+    .. [1] www.nada.kth.se/cvap/databases/kth-tips
+    
+    """
+    def __init__(self, dirpath):
+        super().__init__(dirpath)
+        self.scales = np.asarray([self.get_scale(img) for img in self.images])
+        self.viewpoints = np.asarray(
+                [self.get_viewpoint(img) for img in self.images])
+        self.illuminations = np.asarray(
+                [self.get_illumination(img) for img in self.images])
+        self.acronym = 'KTH2b'
+
+
+    def get_class(self, img):
+        """Extract the class label from the given image file name."""
+        subfolder = os.path.dirname(img)
+        folder, _ = os.path.split(subfolder)
+        return os.path.split(folder)[-1]
+
+
+    def get_scale(self, img):
+        """Extract the scale number from the given image file name."""
+        _, filename = os.path.split(img)
+        _, tail = filename.split('-')
+        return int(tail.split('_')[1])
+
+
+    def get_viewpoint(self, img):
+        """Extract the viewpoint from the given image file name."""
+        _, filename = os.path.split(img)
+        _, tail = filename.split('-')
+        img_number = tail.split('_')[3]
+        if img_number in ['1', '2', '3', '10']:
+            return 'Frontal'
+        elif img_number in ['4', '5', '6', '11']:
+            return '22.5 Right'
+        elif img_number in ['7', '8', '9', '12']:
+            return '22.5 Left'
+        else:
+            raise ValueError('Incorrect image number')
+
+            
+    def get_illumination(self, img):
+        """Extract the illumination direction from the image file name."""        
+        _, filename = os.path.split(img)
+        _, tail = filename.split('-')
+        img_number = tail.split('_')[3]
+        if img_number in ['1', '4', '7']:
+            return 'Frontal'
+        elif img_number in ['2', '5', '8']:
+            return '45 top'
+        elif img_number in ['3', '6', '9']:
+            return '45 side'
+        elif img_number in ['10', '11', '12']:
+            return 'Ambient'
+        else:
+            raise ValueError('Incorrect image number') 
+
+
+class KylbergSintorn(TextureDataset):
+    """Class for the Kylberg Sintorn rotation dataset.
+
+    Notes
+    -----
+    Includes 25 classes of materials such as sugar, knitwear, rice, wool, etc.
+    There is 1 image for each class, which was acquired using 
+    invariable illumination conditions and at 9 in-plane rotation angles. 
+    The images were subdivided into 16 non-verlapping subimages, thus 
+    resulting in 144 samples per class 
+    (25 classes x 1 image/(class & rotation) x 9 rotations x 16 samples/image
+    = 3600 samples in total.
+    
+    Image format : .png (RGB + Transparency)
+    Sample size : 864x1296 px
+                
+    Sample file name : canesugar01-r000-s001.png
+        class : canesugar01
+        rotation : 000 degrees
+        sample : 001
+
+    Examples
+    --------
+    >>> import config
+    >>> kyl = KylbergSintorn(os.path.join(config.imgs, 'KylbergSintorn'))
+    >>> kyl.acronym
+    'KylSin'
+    >>> len(kyl.classes)
+    25
+    >>> len(kyl.images)
+    3600
+    >>> n = 0
+    >>> _, imgname = os.path.split(kyl.images[n])
+    >>> imgname
+    'canesugar01-r000-s001.png'
+    >>> kyl.get_class(kyl.images[n])
+    'canesugar01'
+    >>> kyl.get_rotation(kyl.images[n])
+    0
+
+    References
+    ----------
+    .. [1] http://www.cb.uu.se/~gustaf/KylbergSintornRotation/
+
+    """
+    def __init__(self, dirpath):
+        super().__init__(dirpath)
+        self.rotations = np.asarray(
+                [self.get_rotation(img) for img in self.images])
+        self.acronym = 'KylSin'
+
+
+    def get_class(self, img):
+        """Extract the class label from the given image file name."""        
+        _, fname = os.path.split(img)
+        return fname.split('-')[0]
+
+
+    def get_rotation(self, img):
+        """Extract the rotation angle from the given image file name."""
+        _, fname = os.path.split(img)
+        return int(fname.split('-')[1][1:])
 
 
 class MondialMarmi20(TextureDataset):
@@ -338,6 +570,54 @@ class NewBarkTex(TextureDataset):
         return folder
 
     
+class Outex13(TextureDataset):
+    """Class for the Outex13 dataset.
+         
+    Outex13 consists of 68 classes. The images were acquired under invariable 
+    illumination conditions (rotation 0 degrees, illuminant INCA, resolution 
+    100 dpi) and subdivided into 20 non-overlapping subimages, resulting in a 
+    total number of samples of 1360.
+
+    Image format : .bmp (RGB)
+    Sample size : 128x128 px
+
+    Sample file name : c01/000000.bmp
+        class : c01
+        sample : 000000
+
+    Examples
+    --------
+    >>> import config
+    >>> out = Outex13(os.path.join(config.imgs, 'Outex13'))
+    >>> out.acronym
+    'Outex13'
+    >>> len(out.classes)
+    68
+    >>> len(out.images)
+    1360
+    >>> n = 0
+    >>> _, imgname = os.path.split(out.images[n])
+    >>> imgname
+    '000000.bmp'
+    >>> out.get_class(out.images[n])
+    'c01'
+
+    References
+    ----------
+    .. [1] https://bit.ly/2Yal8tq
+
+    """     
+    def __init__(self, dirpath):
+        super().__init__(dirpath)
+        self.acronym = 'Outex13'
+        
+        
+    def get_class(self, img):
+        """Extract the class label from the given image file pathname."""        
+        head, _ = os.path.split(img)
+        return os.path.split(head)[-1]
+
+
 class PapSmear(TextureDataset):
     """Class for PapSmear dataset.
                 
@@ -422,6 +702,60 @@ class PapSmear(TextureDataset):
             return folder.split('--')[-1]
 
 
+class Parquet(TextureDataset):
+    """Class for Parquet dataset.
+     Notes
+    -----
+    Parquet comprehends 14 commercial varieties of finished wood for 
+    flooring and cladding. Each variety has between 2 and 4 grades, 
+    which are considered as independent classes, yielding a total of 
+    38 classes. Each class is represented by between 6 and 8 images. Each 
+    image was subdivided into 4 non-ovelapping subimages. The total number 
+    of samples is 1180.
+            
+    Image format : .bmp (RGB)
+    Sample size : 240-650 x  600-1000 px (range of nrows x range of ncols) 
+                  240x650 - 650x750 px (range of number of pixels)
+
+    Sample file name : IRK_01_Grade_1__2_3.bmp
+        class : IRK_01_Grade_1
+        image : 2
+        subimage : 3
+
+    Examples
+    --------
+    >>> import config
+    >>> par = Parquet(os.path.join(config.imgs, 'Parquet'))
+    >>> par.acronym
+    'Parquet'
+    >>> len(par.classes)
+    38
+    >>> len(par.images)
+    1180
+    >>> n = 0
+    >>> _, imgname = os.path.split(par.images[n])
+    >>> imgname
+    'IRK_01_Grade_1__1_1.bmp'
+    >>> par.get_class(par.images[n])
+    'IRK_01_Grade_1'
+
+    References
+    ----------
+    .. [1] http://dismac.dii.unipg.it/parquet/
+
+    """    
+    def __init__(self, dirpath):
+        super().__init__(dirpath)
+        self.acronym = 'Parquet'
+
+        
+    def get_class(self, img):
+        """Extract the class label from the given image file name."""        
+        location, _ = os.path.split(img)
+        _, folder = os.path.split(location)
+        return folder
+
+
 class PlantLeaves(TextureDataset):
     """Class for PlantLeaves dataset.
                 
@@ -479,325 +813,6 @@ class PlantLeaves(TextureDataset):
         return folder
 
 
-##############################################################################
-
-#class Drexel(TextureDataset):
-#    r"""Class for the Drexel dataset.
-#
-#    The Drexel Texture Database includes stationary colour textures
-#    representing 20 different materials such as bark, carpet, knit,
-#    sponge, etc. The dataset features 1560 images per class which are the
-#    result of combining 30 viewing conditions (generated by varying the
-#    object-camera distance and the viewpoint) and 52 illumination directions.
-#
-#    Image format : .png (RGB)
-#    Sample size : 85-299 x  71-291 px (range of nrows x range of ncols)
-#                  147x75 - 299x139 px (range of number of pixels)
-#
-#    Examples
-#    --------
-#    Sample file name : aluminium_foil\sample_d\15d-scale_2_im_1_col.png
-#        class : aluminium_foil
-#        corresponding CURET sample number: 15
-#        sample : d
-#        scale number : 2
-#        image number : 1 =>
-#            object pose : frontal
-#            illumination direction: frontal
-#
-#    References
-#    ----------
-#    .. [1] https://www.cs.drexel.edu/~kon/codeanddata/texture/index.html
-#    """
-#
-#    def __init__(self, dirpath):
-#        super(Drexel, self).__init__(dirpath)
-#        self.scales = np.asarray([self.get_scale(img) for img in self.images])
-#        self.viewpoints = np.asarray([self.get_viewpoint(img) for img in self.images])
-#        self.illuminations = np.asarray([self.get_illumination(img) for img in self.images])
-#        self.acronym = 'KTH2b'
-#            
-#
-#    def get_class(self, img):
-#        """Extract the class label from the given image file name."""
-#        subfolder = os.path.dirname(img)
-#        folder, _ = os.path.split(subfolder)
-#        return os.path.split(folder)[-1]
-#
-#
-#    def get_scale(self, img):
-#        """Extract the scale number from the given image file name."""
-#        _, filename = os.path.split(img)
-#        head, tail = filename.split('-')
-#        return int(tail.split('_')[1])
-#
-#
-#    def get_viewpoint(self, img):
-#        """Extract the viewpoint from the given image file name."""
-#        _, filename = os.path.split(img)
-#        head, tail = filename.split('-')
-#        img_number = tail.split('_')[3]
-#        if img_number in ['1','2','3','10']:
-#            return 'Frontal'
-#        elif img_number in ['4','5','6','11']:
-#            return '22.5 Right'
-#        elif img_number in ['7','8','9','12']:
-#            return '22.5 Left'
-#        else:
-#            raise ValueError('Incorrect image number')
-#
-#            
-#    def get_illumination(self, img):
-#        """Extract the illumination direction from the given image file name."""        
-#        _, filename = os.path.split(img)
-#        head, tail = filename.split('-')
-#        img_number = tail.split('_')[3]
-#        if img_number in ['1','4','7']:
-#            return 'Frontal'
-#        elif img_number in ['2','5','8']:
-#            return '45 top'
-#        elif img_number in ['3','6','9']:
-#            return '45 side'
-#        elif img_number in ['10','11','12']:
-#            return 'Ambient'
-#        else:
-#            raise ValueError('Incorrect image number') 
-
-
-class Kather(TextureDataset):
-    r"""Class for Kather dataset.
-
-    Notes
-    -----
-    Kather consists of 5,000 histological images of human colorectal cancer
-    including 8 different types of tissue (625 samples per class).
-
-    Image format : .tif (RGB)
-    Sample size : 150x150 px
-
-    Examples
-    --------
-    Sample file name : 01_TUMOR\1A11_CRC-Prim-HE-07_022.tif_Row_601_Col_151.tif
-        class : 01_TUMOR
-
-    References
-    ----------
-    .. [1] Multi-class texture analysis in colorectal cancer histology
-           Jakob Nikolas Kather, Cleo-Aron Weis, Francesco Bianconi,
-           Susanne M. Melchers, Lothar R. Schad, Timo Gaiser, Alexander Marx
-           and Frank Gerrit Zöllner
-           https://www.nature.com/articles/srep27988
-    """
-
-
-    def __init__(self, dirpath):
-        super(Kather, self).__init__(dirpath)
-        self.acronym = 'Kather'
-        
-
-    def get_class(self, img):
-        """Extract the class label from the given image file name."""
-        head, tail = os.path.split(img)
-        head, tail = os.path.split(head)
-        return tail
-
-
-class KTHTIPS2b(TextureDataset):
-    r"""Class for KTH-TIPS-2b dataset.
-
-    The KTH-TIPS-2b dataset contains 11 types of materials such as bread,
-    cotton, alluminium foil, etc. There are 4 samples per class. Each
-    material sample was acquired under 9 different scales, 3 viewpoints
-    and 4 illumination directions. As a result there are 432 samples
-    per class (4752 samples in total).
-
-    Image format : .png (RGB)
-    Sample size : 85-299 x  71-291 px (range of nrows x range of ncols)
-                  147x75 - 299x139 px (range of number of pixels)
-
-    Examples
-    --------
-    Sample file name : aluminium_foil\sample_d\15d-scale_2_im_1_col.png
-        class : aluminium_foil
-        corresponding CURET sample number: 15
-        sample : d
-        scale number : 2
-        image number : 1 =>
-            object pose : frontal
-            illumination direction: frontal
-
-    References
-    ----------
-    .. [1] www.nada.kth.se/cvap/databases/kth-tips
-    """
-
-    def __init__(self, dirpath):
-        super(KTHTIPS2b, self).__init__(dirpath)
-        self.scales = np.asarray([self.get_scale(img) for img in self.images])
-        self.viewpoints = np.asarray([self.get_viewpoint(img) for img in self.images])
-        self.illuminations = np.asarray([self.get_illumination(img) for img in self.images])
-        self.acronym = 'KTH2b'
-
-
-    def get_class(self, img):
-        """Extract the class label from the given image file name."""
-        subfolder = os.path.dirname(img)
-        folder, _ = os.path.split(subfolder)
-        return os.path.split(folder)[-1]
-
-
-    def get_scale(self, img):
-        """Extract the scale number from the given image file name."""
-        _, filename = os.path.split(img)
-        _, tail = filename.split('-')
-        return int(tail.split('_')[1])
-
-
-    def get_viewpoint(self, img):
-        """Extract the viewpoint from the given image file name."""
-        _, filename = os.path.split(img)
-        _, tail = filename.split('-')
-        img_number = tail.split('_')[3]
-        if img_number in ['1', '2', '3', '10']:
-            return 'Frontal'
-        elif img_number in ['4', '5', '6', '11']:
-            return '22.5 Right'
-        elif img_number in ['7', '8', '9', '12']:
-            return '22.5 Left'
-        else:
-            raise ValueError('Incorrect image number')
-
-            
-    def get_illumination(self, img):
-        """Extract the illumination direction from the given image file name."""        
-        _, filename = os.path.split(img)
-        _, tail = filename.split('-')
-        img_number = tail.split('_')[3]
-        if img_number in ['1', '4', '7']:
-            return 'Frontal'
-        elif img_number in ['2', '5', '8']:
-            return '45 top'
-        elif img_number in ['3', '6', '9']:
-            return '45 side'
-        elif img_number in ['10', '11', '12']:
-            return 'Ambient'
-        else:
-            raise ValueError('Incorrect image number') 
-
-
-class KylbergSintorn(TextureDataset):
-    """Class for the Kylberg Sintorn rotation dataset.
-
-    Notes
-    -----
-    Includes 25 classes of materials such as sugar, knitwear, rice, wool, etc.
-    There is 1 image for each class, which was acquired using 
-    invariable illumination conditions and at 9 in-plane rotation angles. 
-    The images were subdivided into 16 non-verlapping subimages, thus 
-    resulting in 144 samples per class 
-    (25 classes x 1 image/(class & rotation) x 9 rotations x 16 samples/image
-    = 3600 samples in total.
-    
-    Image format : .png (RGB + Transparency)
-    Sample size : 864x1296 px
-                
-    Examples
-    --------
-    Sample file name : canesugar01-r000-s001.png
-        class : canesugar01
-        rotation : 000 degrees
-        sample : 001
-
-    References
-    ----------
-    .. [1] http://www.cb.uu.se/~gustaf/KylbergSintornRotation/
-    """
-
-    def __init__(self, dirpath):
-        super(KylbergSintorn, self).__init__(dirpath)
-        self.rotations = np.asarray([self.get_rotation(img) for img in self.images])
-        self.acronym = 'KylSin'
-
-
-    def get_class(self, img):
-        """Extract the class label from the given image file name."""        
-        _, fname = os.path.split(img)
-        return fname.split('-')[0]
-
-
-    def get_rotation(self, img):
-        """Extract the rotation angle from the given image file name."""
-        _, fname = os.path.split(img)
-        return int(fname.split('-')[1][1:])
-
-
-class Outex13(TextureDataset):
-    """Class for the Outex13 dataset.
-         
-    Outex13 consists of 68 classes. The images were acquired under invariable 
-    illumination conditions (rotation 0 degrees, illuminant INCA, resolution 
-    100 dpi) and subdivided into 20 non-overlapping subimages, resulting in a 
-    total number of samples of 1360.
-
-    Image format : .bmp (RGB)
-    Sample size : 128x128 px
-
-    References
-    ----------
-    .. [1] http://www.outex.oulu.fi/index.php?page=classification#Outex_TC_00013
-    """
-     
-    def __init__(self, dirpath):
-        super(Outex13, self).__init__(dirpath)
-        self.acronym = 'Outex13'
-        
-        
-    def get_class(self, img):
-        """Extract the class label from the given image file pathname."""        
-        head, _ = os.path.split(img)
-        return os.path.split(head)[-1]
-
-
-class Parquet(TextureDataset):
-    r"""Class for Parquet dataset.
-    Notes
-    -----
-    Parquet comprehends 14 commercial varieties of finished wood for 
-    flooring and cladding. Each variety has between 2 and 4 grades, 
-    which are considered as independent classes, yielding a total of 
-    38 classes. Each class is represented by between 6 and 8 images. Each 
-    image was subdivided into 4 non-ovelapping subimages. The total number 
-    of samples is 1180.
-            
-    Image format : .bmp (RGB)
-    Sample size : 240-650 x  600-1000 px (range of nrows x range of ncols) 
-                  240x650 - 650x750 px (range of number of pixels)
-
-    Examples
-    --------
-    Sample file name : IRK_01_Grade_1__2_3.bmp
-        class : IRK_01_Grade_1
-        image : 2
-        subimage : 3
-
-    References
-    ----------
-    .. [1] http://dismac.dii.unipg.it/parquet/
-    """    
-
-    
-    def __init__(self, dirpath):
-        super(Parquet, self).__init__(dirpath)
-        self.acronym = 'Parquet'
-
-        
-    def get_class(self, img):
-        """Extract the class label from the given image file name."""        
-        location, _ = os.path.split(img)
-        _, folder = os.path.split(location)
-        return folder
-
-
 class STex(TextureDataset):
     """Class for STex dataset.
     
@@ -805,31 +820,44 @@ class STex(TextureDataset):
     texture images acquired 'in the wild' around Salzburg, Austria. They 
     mainly represent objects and materials like bark, floor, leather, etc. 
     The dataset comes into two different resolutions, namely 1024x1024 px 
-    and 512x512 px, of which the second was the one we. We further 
+    and 512x512 px, of which the second was the one we use. We further 
     subdivided the original images into 16 non-overlapping subimages of 
     dimensions 128x128 px, resulting in 7616 samples in total.
 
     Image format : .bmp (RGB)
     Sample size : 128x128 px
 
-    Examples
-    --------
     Sample file name : Bark_0004_13.bmp
         class : Bark_0004
         subimage : 13
 
+    Examples
+    --------
+    >>> import config
+    >>> stex = STex(os.path.join(config.imgs, 'STex'))
+    >>> stex.acronym
+    'STex'
+    >>> len(stex.classes)
+    476
+    >>> len(stex.images)
+    7616
+    >>> n = 100
+    >>> _, imgname = os.path.split(stex.images[n])
+    >>> imgname
+    'Bark_0006_05.bmp'
+    >>> stex.get_class(stex.images[n])
+    'Bark_0006'
+    
     References
     ----------
     .. [1] http://www.wavelab.at/sources/STex/
-    """
-    
-            
+
+    """            
     def __init__(self, dirpath):
-        super(STex, self).__init__(dirpath)
+        super().__init__(dirpath)
         self.acronym = 'STex'
 
 
-    ## Returns the class of the given img
     def get_class(self, img):
         """Returns the class of the given img."""        
         folder, _ = os.path.split(img)
@@ -844,30 +872,46 @@ class VxCTSG(TextureDataset):
     considered each grade as a class on its own, which gives 42 classes 
     in total. The images were acquired in laboratory under controlled and 
     invariable conditions. The number of samples per class varies 
-    from 14 to 30, resulting in 7616 samples in total. The images have a 
-    dimension ranging from  to  px.
-
+    from 14 to 30, resulting in 504 samples in total.
+    
     Image format : .bmp (RGB)
-    Sample size : x px
+    Sample size : from 500x500 px to 950x950 px
+
+    Sample file name : berlin-grade11/05.bmp
+        class : berlin-grade11
+        subimage : 05
 
     Examples
     --------
-    Sample file name : 
-        class : 
-        subimage : 
-
+    >>> import config
+    >>> vxc = VxCTSG(os.path.join(config.imgs, 'VxCTSG'))
+    >>> vxc.acronym
+    'VxCTSG'
+    >>> len(vxc.classes)
+    42
+    >>> len(vxc.images)
+    504
+    >>> n = 100
+    >>> folder, imgname = os.path.split(vxc.images[n])
+    >>> os.path.split(folder)[-1]
+    'berlin-grade11'
+    >>> imgname
+    '05.bmp'
+    >>> vxc.get_class(vxc.images[n])
+    'berlin-grade11'
+    
     References
     ----------
     .. [1] Performance evaluation of soft color texture descriptors for 
            surface grading using experimental design and logistic regression
            Fernando López, José Miguel Valiente, José Manuel Prats, 
            and Alberto Ferrer
+           https://bit.ly/2YQfYQx
            http://miron.disca.upv.es/vision/vxctsg/ (broken link)
-    """
-    
-            
+           
+    """ 
     def __init__(self, dirpath):
-        super(VxCTSG, self).__init__(dirpath)
+        super().__init__(dirpath)
         self.acronym = 'VxCTSG'
 
 
@@ -876,6 +920,10 @@ class VxCTSG(TextureDataset):
         folder, _ = os.path.split(img)
         return os.path.split(folder)[-1]
 
+
+################
+# Useful stuff #
+################
 
 def subdivide_CBT(source, destination, x=4, y=4):
     """Utility function for subdividing the RGB images from the
@@ -891,15 +939,17 @@ def subdivide_CBT(source, destination, x=4, y=4):
         Number of vertical subdivisions.
     y : int
         Number of horizontal subdivisions.
+        
     """
     from skimage import io
     from IPython.utils.path import ensure_dir_exists
 
     ensure_dir_exists(destination)
+    
     for n in range(1, 113):
-        imgpath = os.path.join(source, r'D{0}_COLORED.tif'.format(n))
+        imgpath = os.path.join(source, f'D{n}_COLORED.tif')
         img = io.imread(imgpath)
-        folder = os.path.join(destination, r'D{0:03}'.format(n))
+        folder = os.path.join(destination, f'D{n:03}')
         ensure_dir_exists(folder)
         rows = np.int_(np.linspace(0, img.shape[0], x + 1))
         cols = np.int_(np.linspace(0, img.shape[1], y + 1))
@@ -907,7 +957,7 @@ def subdivide_CBT(source, destination, x=4, y=4):
             for j, (start_col, end_col) in enumerate(zip(cols[:-1], cols[1:])):
                 sub = img[start_row:end_row, start_col:end_col, :]
                 sample = 1 + i*y + j
-                subname = r'D{0}_COLORED_{1}.tif'.format(n, sample)
+                subname = f'D{n}_COLORED_{sample}.tif'
                 subpath = os.path.join(folder, subname)
                 io.imsave(subpath, sub)
 
@@ -915,6 +965,16 @@ def subdivide_CBT(source, destination, x=4, y=4):
 def download_KylbergSintorn(destination, x=4, y=4):
     """Utility function to download Kylberg Sintorn Rotation Dataset and
     subdivide the hardware-rotated images.
+    
+    Parameters
+    ----------
+    destination : string
+        Full path of the folder where the subimages will be saved.
+    x : int
+        Number of vertical subdivisions.
+    y : int
+        Number of horizontal subdivisions.
+
     """
     from urllib.request import urlopen
     from bs4 import BeautifulSoup
@@ -934,7 +994,7 @@ def download_KylbergSintorn(destination, x=4, y=4):
             for j, (start_col, end_col) in enumerate(zip(cols[:-1], cols[1:])):
                 sub = img[start_row:end_row, start_col:end_col, :]
                 sample = 1 + i*y + j
-                subname = r'{0}-s{1:03}{2}'.format(fn, sample, ext)
+                subname = f'{fn}-s{sample:03}{ext}'
                 subpath = os.path.join(destination, subname)
                 io.imsave(subpath, sub)
 
@@ -952,6 +1012,7 @@ def subdivide_Parquet(source='', destination='', x=2, y=2):
         Number of vertical subdivisions.
     y : int
         Number of horizontal subdivisions.
+        
     """
     #source = r'D:\mydatadrive\Datos\Texture datasets\Texture databases\Parquet'
     #destination = r'C:\texture\images\Parquet'
@@ -977,82 +1038,12 @@ def subdivide_Parquet(source='', destination='', x=2, y=2):
             for j, (start_col, end_col) in enumerate(zip(cols[:-1], cols[1:])):
                 sub = img[start_row:end_row, start_col:end_col, :]
                 sample = 1 + i*y + j
-                subname = r'{0}_{1}{2}'.format(name, sample, ext)
+                subname = f'{name}_{sample}{ext}'
                 subpath = os.path.join(destination, klass, subname)
                 io.imsave(subpath, sub)
 
-
-##############################################################################    
     
-### Implementation of the RawFooT dataset
-##           
-#class RawFooT(TextureDataset):
-#    """
-#        Implementation of the RawFooT dataset
-#                
-#    Images info:
-#            Comprehends 68 classes(46 samples per class) of raw food and grains
-#            such as corn, chicken breast, pomegranate, salmon and tuna. 
-#            The materials were acquired under 46 different illumination 
-#            conditions resulting in as many image samples for each class. 
-#
-#            Extension  : .png
-#            Resolution : 800x800
-#            shape      : 800x800x3
-#                
-#            An example of img name :  0007-01
-#                                        class : 007
-#                                        sample : 01
-#                                        
-#    Remarks: 
-#       -In this dataset we need to crop images.
-#    """
-#    
-#    def __init__(self, imgdir):
-#        
-#        super(RawFooT, self).__init__(imgdir)
-#        
-#        self.labels = []                
-#        
-#        for img in self.images:
-#            for i in range(4):
-#                self.labels.append(self.get_label(img))
-#        self.labels = np.asarray(self.labels)
-#        self.label = 'RawFooT'
-#            
-#    
-#    ## Returns the class of the img
-#    def get_class(self, img):
-#        """Returns the class of the given img."""
-#        
-#        head, tail = os.path.split(img)
-#        head = head.split('\\')
-#        return head[-1]
-
-
 if __name__ == '__main__':
     
     import doctest
     doctest.testmod()
-#    from IPython.utils.path import ensure_dir_exists
-#    
-#    if platform.system() == 'Linux':
-#        home = r'/mnt/netapp2/Store_uni/home/uvi/dg/afa/texture'
-#    elif platform.system() == 'Windows':
-#        home = r'C:\texture'
-#    
-#    imgs = os.path.join(home, 'images')
-#    data = os.path.join(home, 'data')
-#    log = os.path.join(data, 'log')
-#    
-#    ensure_dir_exists(data)
-#    destination = os.path.join(data, 'KylbergSintorn')
-#    ensure_dir_exists(destination)
-#    download_KylbergSintorn(destination, x=4, y=4)
-
-
-#import os
-#home = r'C:\texture'
-#imgs = os.path.join(home, 'images')
-#c = CBT(os.path.join(imgs, 'CBT'))
-#p = PapSmear(os.path.join(imgs, 'PapSmear'))
