@@ -53,7 +53,7 @@ def introduction_classifiers(estimators):
 
 
 def intro_dims(args):
-    """Generate table of descriptor dimensionalities"""
+    """Generate section with table of descriptor dimensionalities"""
     code = []
     code.append(r'\section*{Dimensionalities}')
     code.append('')
@@ -74,20 +74,21 @@ def intro_dims(args):
     return '\n'.join(code)
 
 
-def introduction_parameters():
-    # !!! Remove hardcoding
+def intro_args(args):
+    """Generate section with command line arguments"""
     code = []
-    code.append(r'\section*{Parameters}')
+    code.append(r'\section*{Command line arguments}')
     code.append('')
     code.append(r'\begin{itemize}')
-    code.append(
-        r"\item \texttt{{bands = 'RGB', 'RBG', 'GRB', 'GBR', 'BRG', 'BGR'}}")
-    code.append(r"\item \texttt{{cref = [0, 0, 0], [127, 127, 127]}}")
-    code.append(r'\item \texttt{{alpha = 2, 4, 8, 16, 32}}')
-    code.append(r'\item \texttt{{seed = 0, 1, 2, 3, 4}}')
+    code.append(rf"\item \texttt{{order = {args.order}}}")
+    code.append(rf"\item \texttt{{radius = {args.radius}}}")
+    code.append(rf"\item \texttt{{bands = {args.bands}}}")
+    code.append(rf"\item \texttt{{alpha = {args.alpha}}}")
+    code.append(rf"\item \texttt{{cref = {args.cref}}}")
+    code.append(rf"\item \texttt{{seed = {args.seed}}}")
     code.append(r'\end{itemize}')
     code.append(r'\newpage')
-    code.append('\n')
+    code.append('')
     return '\n'.join(code)
 
 

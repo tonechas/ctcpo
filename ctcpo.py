@@ -405,8 +405,8 @@ def extract_features(data_folder, imgs_folder, args):
     print(f'Setting up the datasets and descriptors...\n')
 
     for dat in gen_datasets(imgs_folder, args.dataset):
+        dat_id = dat.acronym
         for descr in gen_descriptors(args):
-            dat_id = dat.acronym
             for rad in descr.radius:
                 descr_rad = copy.deepcopy(descr)
                 descr_rad.radius = [rad]
@@ -445,7 +445,7 @@ def get_features(folder, dataset, descriptor):
     X : array
         Texture features. The number of rows is equal to the number of
         samples and the number of columns is equal to the dimensionality
-        of the feature space. If an error occurs whitin the call to 
+        of the feature space. If an error occurs within the call to 
         `apply_descriptor`, returns None.
         
     """
@@ -531,10 +531,10 @@ def grid_search_cv(X, y, clf, param_grid, n_folds, test_size, random_state):
     return [gscv, test_score]
 
 
-def classify(folder, datasets, descriptors, estimators, test_size, n_tests, 
+def classify(data_folder, imgs_folder, args, estimators, test_size, n_tests, 
              n_folds, random_state):
     '''
-    classify(folder, datasets, descriptors, estimators, test_size, n_tests, 
+    classify(data_folder, imgs_folder, args, estimators, test_size, n_tests, 
              n_folds, random_state)
     
     Compute classification results.
@@ -545,14 +545,12 @@ def classify(folder, datasets, descriptors, estimators, test_size, n_tests,
 
     Parameters
     ----------
-    folder : string
+    data_folder : string
         Full path of the folder where data are saved.
-    datasets : generator
-        Generator of instances of `texdata.TextureDataset` (for example 
-        `Kather`, `MondialMarmi20`, etc.) to extract features from.
-    descriptors : generator
-        Generator of instances of `hep.HEP` (for example `RankTransform`,
-        `LocalDirectionalRankCoding`, etc.) used to compute features.
+    imgs_folder : string
+        Full path of the folder where texture datasets are stored.
+    args : argparse.Namespace
+        Command line arguments.
     estimators : list of tuples
         Each tuple consist in a classifier (such as nearest neighbour,
         support vector machine, etc.) and the parameters used for
@@ -572,36 +570,40 @@ def classify(folder, datasets, descriptors, estimators, test_size, n_tests,
     utils.boxed_text('Classifying...', symbol='*')
     print(f'Setting up the datasets, descriptors and classifiers...\n')
 
-    for items in itertools.product(estimators, datasets, descriptors):
-        (clf, param_grid), dat, descr = items
-        dat_id = dat.acronym
-        descr_id = descr.abbrev()
+    for clf, param_grid in estimators:
         clf_id = clf.__name__
-        print(f'Computing {dat_id}--{descr_id}--{clf_id}', flush=True)
-        result_path = utils.filepath(folder, dat_id, descr_id, clf.__name__)
-        if os.path.isfile(result_path):
-            result = utils.load_object(result_path)
-        else:
-            X = get_features(folder, dat, descr)
-            if X is None:
-                continue
-            y = dat.labels
-            np.random.seed(random_state)
-            random_states = np.random.randint(size=n_tests, low=0, high=1000)    
-            # It is essential to pass a different `rstate` to 
-            # `grid_search_cv` for each grid search. Otherwise data are 
-            # split into train and test always the same way and as a 
-            # consequence, the results returned by `grid_search_cv` 
-            # are identical.
-            result = [
-                grid_search_cv(X, y, clf, param_grid, n_folds, test_size, rs)
-                for rs in random_states]
-            utils.save_object(result, result_path)
-
-        best_scores = [g.best_score_ for g, _ in result]
-        test_scores = [ts for _, ts in result]
-        print(f'Mean best cv score: {100*np.mean(best_scores):.2f}%')
-        print(f'Mean test score: {100*np.mean(test_scores):.2f}%\n')
+        for dat in gen_datasets(imgs_folder, args.dataset):
+            dat_id = dat.acronym
+            for descr in gen_descriptors(args):
+                descr_id = descr.abbrev()                
+                print(f'Computing {dat_id}--{descr_id}--{clf_id}', flush=True)
+                result_path = utils.filepath(
+                        data_folder, dat_id, descr_id, clf_id)
+                if os.path.isfile(result_path):
+                    result = utils.load_object(result_path)
+                else:
+                    X = get_features(data_folder, dat, descr)
+                    if X is None:
+                        continue
+                    y = dat.labels
+                    np.random.seed(random_state)
+                    random_states = np.random.randint(size=n_tests, low=0, 
+                                                      high=1000)    
+                    # It is essential to pass a different `rstate` to 
+                    # `grid_search_cv` for each grid search. Otherwise  
+                    # data are split into train and test always the same  
+                    # way and as a consequence, the results returned by 
+                    # `grid_search_cv` are identical.
+                    result = [
+                        grid_search_cv(X, y, clf, param_grid, n_folds, 
+                                       test_size, rs)
+                        for rs in random_states]
+                    utils.save_object(result, result_path)
+        
+                best_scores = [g.best_score_ for g, _ in result]
+                test_scores = [ts for _, ts in result]
+                print(f'Mean best cv score: {100*np.mean(best_scores):.2f}%')
+                print(f'Mean test score: {100*np.mean(test_scores):.2f}%\n')
 
 
 #def command_line_arguments(folder, datasets, descriptors, estimators=None):
@@ -636,9 +638,9 @@ def job_script():
     print('Generating job script...\n')
 #    for dat, descr in itertools.product(datasets, descriptors):
     for dat in gen_datasets(config.imgs, args.dataset):
-        print(psutil.virtual_memory(), flush=True)
+        dat_id = dat.acronym
+#        print(psutil.virtual_memory(), flush=True)
         for descr in gen_descriptors(args):
-            dat_id = dat.acronym
             for rad in descr.radius:
                 try:
                     descr_single = copy.deepcopy(descr)
@@ -712,15 +714,18 @@ def job_script():
 def generate_latex(args):
     """Automatically generate LaTeX source code for report"""
     # Generate introductory sections
-    src = reportex.intro_dims(args)
-    print(src)
+    src = []
+    src.append(reportex.intro_dims(args))
+    src.append(reportex.intro_args(args))
+    code = '\n'.join(src)
+    print(code)
     with open(os.path.join(config.data, 'report.tex'), 'w') as f:
-        print(src, file=f)
+        print(code, file=f)
 
 
 def delete_files(data_folder, imgs_folder, args, estimators=None, both=True):
     '''
-    delete_files(data_folder, imgs_folder, args estimators=None, both=True)
+    delete_files(data_folder, imgs_folder, args, estimators=None, both=True)
     
     Delete previously computed features or classification results.
 
@@ -754,14 +759,14 @@ def delete_files(data_folder, imgs_folder, args, estimators=None, both=True):
     ans = input(f'Are you sure you want to delete {outcome}? (Y/[N]) ')
     print()
 
-    utils.boxed_text('Extracting features...', symbol='*')
+    utils.boxed_text('Deleting features...', symbol='*')
     print(f'Setting up the datasets and descriptors...\n')
 
     if ans and 'yes'.startswith(ans.lower()):
         print(f'Preparing to delete {outcome}...\n')
         for dat in gen_datasets(imgs_folder, args.dataset):
+            dat_id = dat.acronym
             for descr in gen_descriptors(args):
-                dat_id = dat.acronym
                 for rad in descr.radius:
                     descr_single = copy.deepcopy(descr)
                     descr_single.radius = [rad]
@@ -842,7 +847,7 @@ if __name__ == '__main__':
     parser = make_parser()
     if len(sys.argv) == 1:
         # No command-line arguments, intended for running the program from IDE
-        testargs = ['@args_one.txt', '--action', 'j']
+        testargs = ['@args_all.txt', '--action', 'l']
         #testargs = '--act j --dataset CBT --desc RankTransform'.split()
         fake_argv = [sys.argv[0]] + testargs
         with patch.object(sys, 'argv', fake_argv):
@@ -869,25 +874,22 @@ if __name__ == '__main__':
     IPython.utils.path.ensure_dir_exists(config.data)
     
     # Set up the generators of datasets and descriptors
-    datasets = gen_datasets(config.imgs, args.dataset)
-    descriptors = gen_descriptors(args)
+#    datasets = gen_datasets(config.imgs, args.dataset)
+#    descriptors = gen_descriptors(args)
 
     # Execute the proper action
     option = args.action.lower()
     if option == 'ef':
         extract_features(config.data, config.imgs, args)
     elif option == 'c':
-        classify(config.data, datasets, descriptors, 
-                 config.estimators, config.test_size, 
-                 config.n_tests, config.n_folds, config.random_state)
+        classify(config.data, config.imgs, args, config.estimators, 
+                 config.test_size, config.n_tests, 
+                 config.n_folds, config.random_state)
     elif option == 'efc':
         extract_features(config.data, config.imgs, args)
-        # The generators are now exhausted and need to be refreshed
-        datasets = gen_datasets(config.imgs, args.dataset)
-        descriptors = gen_descriptors(args)
-        classify(config.data, datasets, descriptors, 
-                 config.estimators, config.test_size, 
-                 config.n_tests, config.n_folds, config.random_state)
+        classify(config.data, config.imgs, args, config.estimators, 
+                 config.test_size, config.n_tests, 
+                 config.n_folds, config.random_state)
     elif option == 'j':
         job_script()
     elif option == 'l':

@@ -1,4 +1,4 @@
---action j
+--action efc
 --dataset NewBarkTex
 --descriptor ImprovedCenterSymmetricLocalBinaryPattern
 --radius 1
