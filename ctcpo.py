@@ -335,7 +335,7 @@ def apply_descriptor(dataset, descriptor, print_info=False):
         of the feature space. If an error occurs it returns `None`.
         
     """
-    orders_for_gray = ('linear')
+    orders_for_gray = ('linear',)
     orders_for_uint8 = ('bitmixing', 'refcolor')
     dataset_id = dataset.acronym
     descriptor_id = descriptor.abbrev()
@@ -459,7 +459,7 @@ def get_features(folder, dataset, descriptor):
         if os.path.isfile(feat_path):
             X = utils.load_object(feat_path)
         else:
-            print(f'Computing features {dataset_id}--{descr_single_id}')
+            print(f'Computing {dataset_id}--{descr_single_id}')
             X = apply_descriptor(dataset, descr_single)
             if X is not None:
                 utils.save_object(X, feat_path)
@@ -571,12 +571,12 @@ def classify(data_folder, imgs_folder, args, estimators, test_size, n_tests,
     print(f'Setting up the datasets, descriptors and classifiers...\n')
 
     for clf, param_grid in estimators:
-        clf_id = clf.__name__
+        clf_id = ''.join(
+                [letter for letter in clf.__name__ if letter.isupper()])
         for dat in gen_datasets(imgs_folder, args.dataset):
             dat_id = dat.acronym
             for descr in gen_descriptors(args):
                 descr_id = descr.abbrev()                
-                print(f'Computing {dat_id}--{descr_id}--{clf_id}', flush=True)
                 result_path = utils.filepath(
                         data_folder, dat_id, descr_id, clf_id)
                 if os.path.isfile(result_path):
@@ -584,7 +584,11 @@ def classify(data_folder, imgs_folder, args, estimators, test_size, n_tests,
                 else:
                     X = get_features(data_folder, dat, descr)
                     if X is None:
+                        print(f'Skipping {dat_id}--{descr_id}--{clf_id}', 
+                              flush=True)
                         continue
+                    print(f'Computing {dat_id}--{descr_id}--{clf_id}', 
+                          flush=True)
                     y = dat.labels
                     np.random.seed(random_state)
                     random_states = np.random.randint(size=n_tests, low=0, 
@@ -594,10 +598,9 @@ def classify(data_folder, imgs_folder, args, estimators, test_size, n_tests,
                     # data are split into train and test always the same  
                     # way and as a consequence, the results returned by 
                     # `grid_search_cv` are identical.
-                    result = [
-                        grid_search_cv(X, y, clf, param_grid, n_folds, 
-                                       test_size, rs)
-                        for rs in random_states]
+                    result = [grid_search_cv(X, y, clf, param_grid, n_folds, 
+                                             test_size, rs) 
+                              for rs in random_states]
                     utils.save_object(result, result_path)
         
                 best_scores = [g.best_score_ for g, _ in result]
@@ -637,19 +640,23 @@ def classify(data_folder, imgs_folder, args, estimators, test_size, n_tests,
 def job_script():
     print('Generating job script...\n')
 #    for dat, descr in itertools.product(datasets, descriptors):
-    for dat in gen_datasets(config.imgs, args.dataset):
-        dat_id = dat.acronym
+    count = 0
+#    for dat in gen_datasets(config.imgs, args.dataset):
+#        dat_id = dat.acronym
 #        print(psutil.virtual_memory(), flush=True)
+    with open('putamierda.txt', 'w') as f:
         for descr in gen_descriptors(args):
             for rad in descr.radius:
                 try:
                     descr_single = copy.deepcopy(descr)
                     descr_single.radius = [rad]
                     descr_single_id = descr_single.abbrev()
-                    print(f'Computing {dat_id}--{descr_single_id}', flush=True)
-#                    print(f'{psutil.virtual_memory()[3]/(1024**2):.1f}', flush=True)
+                    count += 1
+    #                print(f'Computing {dat_id}--{descr_single_id}', flush=True)
+                    print(f'{count:3} --  {descr_single_id}', file=f)
+    #                    print(f'{psutil.virtual_memory()[3]/(1024**2):.1f}', flush=True)
                 except MemoryError:
-                    print(f'MemoryError: skipping {dat_id}--{descr_single_id}', flush=True)
+                    print()#f'MemoryError: skipping {dat_id}--{descr_single_id}', flush=True)
     print()
     
 #def job_script(folder, job_id, partition, datasets, descriptors, estimators=None)#data, loops):
@@ -711,25 +718,46 @@ def job_script():
 #        save_job_script(job_file, script)
 #    print('Generating job script...')
 
-def generate_latex(args):
-    """Automatically generate LaTeX source code for report"""
-    # Generate introductory sections
-    src = []
-    src.append(reportex.intro_dims(args))
-    src.append(reportex.intro_args(args))
-    code = '\n'.join(src)
-    print(code)
-    with open(os.path.join(config.data, 'report.tex'), 'w') as f:
-        print(code, file=f)
+
+def delete_one_file(path_args):
+    fname = utils.filepath(*path_args)
+    utils.attempt_to_delete_file(fname)
 
 
-def delete_files(data_folder, imgs_folder, args, estimators=None, both=True):
-    '''
-    delete_files(data_folder, imgs_folder, args, estimators=None, both=True)
-    
-    Delete previously computed features or classification results.
+def delete_features(data_folder, imgs_folder, args):
+    """Delete previously computed features.
 
-    Search for the features/classification results files corresponding 
+    Search for the features files corresponding to the passed datasets,
+    and descriptors, and delete them (if they exist).
+
+    Parameters
+    ----------
+    data_folder : str
+        Path of the folder where data are stored.
+    imgs_folder : string
+        Full path of the folder where texture datasets are stored.
+    args : argparse.Namespace
+        Command line arguments.
+        
+    """
+    for dat in gen_datasets(imgs_folder, args.dataset):
+        dat_id = dat.acronym
+        for descr in gen_descriptors(args):
+            descr_id = descr.abbrev()
+            if len(descr.radius) == 1:
+                delete_one_file([data_folder, dat_id, descr_id])
+            else:
+                for rad in descr.radius:
+                    descr_single = copy.deepcopy(descr)
+                    descr_single.radius = [rad]
+                    descr_single_id = descr_single.abbrev()
+                    delete_one_file([data_folder, dat_id, descr_single_id])
+
+
+def delete_results(data_folder, imgs_folder, args, estimators):
+    """Delete previously computed classification results.
+
+    Search for the classification results files corresponding 
     to the passed datasets, descriptors and estimators, and delete them 
     (if they exist).
 
@@ -744,45 +772,54 @@ def delete_files(data_folder, imgs_folder, args, estimators=None, both=True):
     estimators : list of tuples, optional (default `None`)
         Estimators used to assess generalization error. List of tuples 
         of the form (classifier, parameters).
-    both : bool, optional (default `False`)
-        If `True` features and classification data are deleted. If `False`, 
-        either features or classification data are deleted (but not both).
-
-    '''
-
-    if both:
-        outcome = 'features and classification results'
-    elif estimators is not None:
-        outcome = 'classification results'
-    else:
-        outcome = 'features'
-    ans = input(f'Are you sure you want to delete {outcome}? (Y/[N]) ')
-    print()
-
-    utils.boxed_text('Deleting features...', symbol='*')
-    print(f'Setting up the datasets and descriptors...\n')
-
-    if ans and 'yes'.startswith(ans.lower()):
-        print(f'Preparing to delete {outcome}...\n')
+        
+    """
+    for clf, _ in estimators:
+        caps = [letter for letter in clf.__name__  if letter.isupper()]
+        clf_id = ''.join(caps)
         for dat in gen_datasets(imgs_folder, args.dataset):
             dat_id = dat.acronym
             for descr in gen_descriptors(args):
-                for rad in descr.radius:
-                    descr_single = copy.deepcopy(descr)
-                    descr_single.radius = [rad]
-                    descr_single_id = descr_single.abbrev()
-                    feat_args = [data_folder, dat_id, descr_single_id]
-                    if both or (estimators is None):
-                        fname = utils.filepath(*feat_args)
-                        utils.attempt_to_delete_file(fname)
-                    if both or (estimators is not None):
-                        for clf, _ in estimators:
-                            res_args = feat_args + [clf.__name__]
-                            fname = utils.filepath(*res_args)
-                            utils.attempt_to_delete_file(fname)
+                descr_id = descr.abbrev()
+                delete_one_file([data_folder, dat_id, descr_id, clf_id])
+                if len(descr.radius) > 1:
+                    for rad in descr.radius:
+                        descr_single = copy.deepcopy(descr)
+                        descr_single.radius = [rad]
+                        descr_single_id = descr_single.abbrev()
+                        delete_one_file([data_folder, dat_id, descr_single_id, 
+                                         clf_id])
+
+
+def confirm_deletion(outcome):
+    '''Confirm deletion of files
+    
+    Parameters
+    ----------
+    outcome : str
+        The type of data to be deleted, for example features or
+        classification results.
+
+    Returns
+    -------
+    True if the user answers affirmatively to the confirmation prompt, 
+    False otherwise.
+
+    '''
+    utils.boxed_text('Deleting features...', symbol='*')
+#    print(f'Setting up the datasets and descriptors...\n')
+
+    ans = input(f'Are you sure you want to delete {outcome}? (Y/[N]) ')
+    print()
+
+    if ans and 'yes'.startswith(ans.lower()):
+        print(f'Preparing to delete {outcome}...\n')
+        return True
     else:
         print(f'No {outcome} deleted\n')
-    print()
+        return False
+
+ 
 
 
 def display_arguments(args):
@@ -847,8 +884,8 @@ if __name__ == '__main__':
     parser = make_parser()
     if len(sys.argv) == 1:
         # No command-line arguments, intended for running the program from IDE
-        testargs = ['@args_all.txt', '--action', 'l']
-        #testargs = '--act j --dataset CBT --desc RankTransform'.split()
+        #testargs = ['@args_all.txt', '--action', 'j']
+        testargs = '--act efc --dataset VxCTSG --desc RankTransform --order product linear --radius 1,2'.split()
         fake_argv = [sys.argv[0]] + testargs
         with patch.object(sys, 'argv', fake_argv):
             args = parser.parse_args()
@@ -873,10 +910,6 @@ if __name__ == '__main__':
     # Make sure data directory exists
     IPython.utils.path.ensure_dir_exists(config.data)
     
-    # Set up the generators of datasets and descriptors
-#    datasets = gen_datasets(config.imgs, args.dataset)
-#    descriptors = gen_descriptors(args)
-
     # Execute the proper action
     option = args.action.lower()
     if option == 'ef':
@@ -893,15 +926,17 @@ if __name__ == '__main__':
     elif option == 'j':
         job_script()
     elif option == 'l':
-        generate_latex(args)
+        reportex.generate_latex(args, config)
     elif option == 'df':
-        delete_files(config.data, config.imgs, args, both=False)
+        if confirm_deletion('features'):
+            delete_features(config.data, config.imgs, args)
     elif option == 'dr':
-        delete_files(config.data, config.imgs, args, 
-                     config.estimators, both=False)
+        if confirm_deletion('results'):
+            delete_results(config.data, config.imgs, args, config.estimators)
     elif option == 'da':
-        delete_files(config.data, config.imgs, args, 
-                     config.estimators, both=True)
+        if confirm_deletion('features and results'):
+            delete_features(config.data, config.imgs, args)
+            delete_results(config.data, config.imgs, args, config.estimators)
     else:
         print(f"Argument \"--action {args.action}\" is not valid")
         print('Run:')

@@ -1,4 +1,4 @@
---action l
+--action j
 #--action ef c efc j l df dc da
 
 --dataset 
@@ -23,20 +23,20 @@ VxCTSG
 CompletedLocalBinaryCountSM
 CompletedLocalBinaryCountSMC
 ImprovedCenterSymmetricLocalBinaryPattern
+LocalConcaveConvexMicroStructurePatterns
 LocalConcaVeMicroStructurePatterns
 LocalConveXMicroStructurePatterns
-LocalConcaveConvexMicroStructurePatterns
 LocalDirectionalRankCoding
 RankTransform
 
 --order linear product lexicographic bitmixing alphamod refcolor random
 
---radius  1  2  3  1,2  1,2,3
+--radius 1 2 3
 
 --bands RGB RBG GRB GBR BRG BGR
 
---alpha  2  4  8  16  32
+--alpha 2 4 8 16 32
 
---cref  0,0,0  127,127,127
+--cref 0,0,0 127,127,127
 
 --seed 0 1 2 3 4
