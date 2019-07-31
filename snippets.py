@@ -603,3 +603,215 @@ z = np.random.permutation(256)
 #    ensure_dir_exists(destination)
 #    download_KylbergSintorn(destination, x=4, y=4)
 
+def job_script(folder, job_id, partition, datasets, descriptors, estimators=None)#data, loops):
+    """
+    !!!
+    """
+    for dat, descr in itertools.product(datasets, descriptors):
+        dat_id = dat.acronym
+        for rad in descr.radius:
+            descr_single = copy.deepcopy(descr)
+            descr_single.radius = [rad]
+            descr_single_id = descr_single.abbrev()
+            feat_args = [folder, dat_id, descr_single_id]
+            if estimators is None:
+                this_one = utils.filepath(*feat_args)
+            else:
+                for clf, _ in estimators:
+                    res_args = feat_args + [clf.__name__]
+                    this_one = utils.filepath(*res_args)
+
+
+
+    datasets, descriptors, estimators = loops
+    utils.display_sequence(datasets, 'Datasets', symbol='-')
+    utils.display_sequence(descriptors, 'Descriptors', symbol='-')
+    utils.display_sequence(
+        [est[0].__name__ for est in estimators], 'Classifiers', symbol='-')
+
+    utils.display_message('Creating arguments file and job script', symbol='*')
+
+    tasks = command_line_arguments(data, loops)
+    count = len(tasks)
+
+    if count == 0:
+        print('All tasks are already completed. Did not generate script.\n')
+    else:
+        args_file = 'args_{}.config'.format(job_id)
+        save_args_file(args_file, tasks)
+        job_file = 'job_{}.sh'.format(job_id)
+        if partition == 'cola-corta':
+            time_limit = '10:00:00'
+            max_ntasks = 48
+        elif partition == 'thinnodes':
+            time_limit = '4-00:00:00'
+            max_ntasks = 48
+        elif partition == 'fatsandy':
+            partition = 'fatsandy --qos shared'
+            max_ntasks = 32
+            time_limit = '4-04:00:00'
+
+        # Workaround to keep the number of nodes low
+        if count > max_ntasks:
+            count = max_ntasks
+
+        with open('job_template.sh', 'r') as fscript:
+            script = fscript.read().format(
+                jobname=job_id, partition=partition,
+                maxtime=time_limit, ntasks=count)
+        save_job_script(job_file, script)
+    print('Generating job script...')
+
+
+def command_line_arguments(folder, datasets, descriptors, estimators=None):
+    ''' !!! Missing docstring.'''
+    lines = []
+
+    for dbase, descr in itertools.product(datasets, descriptors):
+        for (clf, _) in estimators:
+            if not (check_features(data, dbase, descr) \
+                    and check_results(data, dbase, descr, clf)):
+                task = '--action all --datasets {} '.format(dbase)
+                task += '--descriptor {} '.format(
+                    descr.__class__.__name__)
+                task += '--order {} '.format(descr.order)
+                task += '--radius {} '.format(
+                    ' '.join([str(r) for r in descr.radius]))
+                if descr.order in ('lexicographic', 'bitmixing'):
+                    task += '--bands {} '.format(descr.bands)
+                elif descr.order == 'alphamod':
+                    task += '--alpha {} '.format(descr.alpha)
+                elif descr.order == 'refcolor':
+                    task += '--cref {} '.format(
+                        ' '.join([str(i) for i in descr.cref]))
+                elif descr.order == 'random':
+                    task += '--seed {} '.format(descr.seed)
+                lines.append(task)
+                break
+    return lines
+
+
+
+#vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv#
+
+#def lexicographic_order(neighbour, central, bandperm=(0, 1, 2), comp=np.less):
+#    """
+#    Compare a peripheral pixel and the central pixel of the neighbourhood
+#    using the lexicographic order.
+#
+#    Parameters
+#    ----------
+#    neighbour : array
+#        Subimage corresponding to a peripheral pixel of the neighbourhood.
+#    central : array
+#        Subimage corresponding to the central pixels of the neighbourhood.
+#    bandperm : tuple
+#        Permutation of the chromatic channels (defined by their indices)
+#        which establishes the priority considered in the lexicographic order.
+#    comp : Numpy function, optional (default np.less)
+#        Comparison function (np.greater, np.less_equal, etc.).
+#
+#    Returns
+#    -------
+#    result : boolean array
+#        Truth value of comp (neighbour, central) element-wise according to
+#        the lexicographic order.
+#
+#    References
+#    ----------
+#    .. [1] E. Aptoula and S. Lefêvre
+#           A comparative study on multivariate mathematical morphology
+#           https://doi.org/10.1016/j.patcog.2007.02.004
+#    """
+#    weights = np.asarray([256**np.arange(central.shape[2])[::-1]])
+#    ord_central = np.sum(central[:, :, bandperm]*weights, axis=-1)
+#    ord_neighbour = np.sum(neighbour[:, :, bandperm]*weights, axis=-1)
+#    result = comp(ord_neighbour, ord_central)
+#    return result
+#
+#
+#def bitmixing_order(neighbour, central, lut, bandperm=(0, 1, 2), comp=np.less):
+#    """
+#    Compare a peripheral pixel and the central pixel of the neighbourhood
+#    using the bit mixing order.
+#
+#    Parameters
+#    ----------
+#    neighbour : array
+#        Subimage corresponding to a peripheral pixel of the neighbourhood.
+#    central : array
+#        Subimage corresponding to the central pixels of the neighbourhood.
+#    lut : array
+#        3D Lookup table
+#    bandperm : tuple
+#        Permutation of the chromatic channels (defined by their indices)
+#        which establishes the priority considered in the bit mixing order.
+#    comp : Numpy function, optional (default np.less)
+#        Comparison function (np.greater, np.less_equal, etc.).
+#
+#    Returns
+#    -------
+#    result : boolean array
+#        Truth value of comp (neighbour, central) element-wise according to
+#        the bit mixing product order.
+#
+#    References
+#    ----------
+#    .. [1] J. Chanussot and P. Lambert
+#           Bit mixing paradigm for multivalued morphological filters
+#           https://doi.org/10.1049/cp:19971007
+#    """
+#    ord_central = lut[tuple(central[:, :, bandperm].T)].T
+#    ord_neighbour = lut[tuple(neighbour[:, :, bandperm].T)].T
+#    result = comp(ord_neighbour, ord_central)
+#    return result
+#
+#
+#def refcolor_order(neighbour, central, cref=[0, 0, 0], comp=np.less):
+#    """
+#    Compare a peripheral pixel and the central pixel of the neighbourhood
+#    using the reference color order.
+#
+#    Parameters
+#    ----------
+#    neighbour : array
+#        Subimage corresponding to a peripheral pixel of the neighbourhood.
+#    central : array
+#        Subimage corresponding to the central pixels of the neighbourhood.
+#    cref : tuple
+#        Permutation of the chromatic channels (defined by their indices)
+#        which establishes the priority considered in the lexicographic order.
+#    comp : Numpy function, optional (default np.less)
+#        Comparison function (np.greater, np.less_equal, etc.).
+#
+#    Returns
+#    -------
+#    result : boolean array
+#        Truth value of comp (neighbour, central) element-wise according to
+#        the reference color order.
+#
+#    .. [1] A. Ledoux, R. Noël, A.-S. Capelle-Laizé and C. Fernandez-Maloigne
+#           Toward a complete inclusion of the vector information in
+#           morphological computation of texture features for color images
+#           https://doi.org/10.1007/978-3-319-07998-1_25
+#    """
+#    cref = np.asarray(cref).astype(np.int_)
+#    dist_central = np.linalg.norm(central - cref)
+#    dist_neighbour = np.linalg.norm(neighbour - cref)
+#    result =  comp(dist_neighbour, dist_central)
+#    return result
+
+#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^#
+
+class Concatenation(object):
+    """Class for concatenation of HEP descriptors."""
+    def __init__(self, *descriptors):
+        self.descriptors = descriptors
+
+    def __call__(self, img):
+        return np.concatenate([d(img) for d in self.descriptors])
+
+    def __str__(self):
+        return '+'.join([d.__str__() for d in self.descriptors])
+
+

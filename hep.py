@@ -25,7 +25,7 @@ def square_frame_size(radius):
         Radii of the local neighborhoods.
 
     Returns
-    ----------
+    -------
     points : list of int
         Number of pixels of the local neighborhoods.
 
@@ -65,116 +65,6 @@ def histogram(codes, nbins):
     h_norm = hist/hist.sum()
     return h_norm
 
-#vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv#
-
-#def lexicographic_order(neighbour, central, bandperm=(0, 1, 2), comp=np.less):
-#    """
-#    Compare a peripheral pixel and the central pixel of the neighbourhood
-#    using the lexicographic order.
-#
-#    Parameters
-#    ----------
-#    neighbour : array
-#        Subimage corresponding to a peripheral pixel of the neighbourhood.
-#    central : array
-#        Subimage corresponding to the central pixels of the neighbourhood.
-#    bandperm : tuple
-#        Permutation of the chromatic channels (defined by their indices)
-#        which establishes the priority considered in the lexicographic order.
-#    comp : Numpy function, optional (default np.less)
-#        Comparison function (np.greater, np.less_equal, etc.).
-#
-#    Returns
-#    -------
-#    result : boolean array
-#        Truth value of comp (neighbour, central) element-wise according to
-#        the lexicographic order.
-#
-#    References
-#    ----------
-#    .. [1] E. Aptoula and S. Lefêvre
-#           A comparative study on multivariate mathematical morphology
-#           https://doi.org/10.1016/j.patcog.2007.02.004
-#    """
-#    weights = np.asarray([256**np.arange(central.shape[2])[::-1]])
-#    ord_central = np.sum(central[:, :, bandperm]*weights, axis=-1)
-#    ord_neighbour = np.sum(neighbour[:, :, bandperm]*weights, axis=-1)
-#    result = comp(ord_neighbour, ord_central)
-#    return result
-#
-#
-#def bitmixing_order(neighbour, central, lut, bandperm=(0, 1, 2), comp=np.less):
-#    """
-#    Compare a peripheral pixel and the central pixel of the neighbourhood
-#    using the bit mixing order.
-#
-#    Parameters
-#    ----------
-#    neighbour : array
-#        Subimage corresponding to a peripheral pixel of the neighbourhood.
-#    central : array
-#        Subimage corresponding to the central pixels of the neighbourhood.
-#    lut : array
-#        3D Lookup table
-#    bandperm : tuple
-#        Permutation of the chromatic channels (defined by their indices)
-#        which establishes the priority considered in the bit mixing order.
-#    comp : Numpy function, optional (default np.less)
-#        Comparison function (np.greater, np.less_equal, etc.).
-#
-#    Returns
-#    -------
-#    result : boolean array
-#        Truth value of comp (neighbour, central) element-wise according to
-#        the bit mixing product order.
-#
-#    References
-#    ----------
-#    .. [1] J. Chanussot and P. Lambert
-#           Bit mixing paradigm for multivalued morphological filters
-#           https://doi.org/10.1049/cp:19971007
-#    """
-#    ord_central = lut[tuple(central[:, :, bandperm].T)].T
-#    ord_neighbour = lut[tuple(neighbour[:, :, bandperm].T)].T
-#    result = comp(ord_neighbour, ord_central)
-#    return result
-#
-#
-#def refcolor_order(neighbour, central, cref=[0, 0, 0], comp=np.less):
-#    """
-#    Compare a peripheral pixel and the central pixel of the neighbourhood
-#    using the reference color order.
-#
-#    Parameters
-#    ----------
-#    neighbour : array
-#        Subimage corresponding to a peripheral pixel of the neighbourhood.
-#    central : array
-#        Subimage corresponding to the central pixels of the neighbourhood.
-#    cref : tuple
-#        Permutation of the chromatic channels (defined by their indices)
-#        which establishes the priority considered in the lexicographic order.
-#    comp : Numpy function, optional (default np.less)
-#        Comparison function (np.greater, np.less_equal, etc.).
-#
-#    Returns
-#    -------
-#    result : boolean array
-#        Truth value of comp (neighbour, central) element-wise according to
-#        the reference color order.
-#
-#    .. [1] A. Ledoux, R. Noël, A.-S. Capelle-Laizé and C. Fernandez-Maloigne
-#           Toward a complete inclusion of the vector information in
-#           morphological computation of texture features for color images
-#           https://doi.org/10.1007/978-3-319-07998-1_25
-#    """
-#    cref = np.asarray(cref).astype(np.int_)
-#    dist_central = np.linalg.norm(central - cref)
-#    dist_neighbour = np.linalg.norm(neighbour - cref)
-#    result =  comp(dist_neighbour, dist_central)
-#    return result
-
-#^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^#
 
 class HEP(object):
     """Superclass for histogram of equivalent patterns descriptors.
@@ -370,7 +260,7 @@ class HEP(object):
         
         Parameters
         ----------
-        descriptor : HEP.hep
+        descriptor : hep.HEP
             Instance of a HEP texture descriptor.
             
         Returns
@@ -439,7 +329,7 @@ class HEP(object):
 
         Returns
         -------
-        descr : `HEP`
+        descr : hep.HEP
             Instance with the same attributes as `self` except `radius`,
             which contains a single scale.
             
@@ -457,9 +347,9 @@ class HEP(object):
 
         Parameters
         ----------
-        xarr, yarr : arrays
+        xarr, yarr : array
             Images to be compared.
-        comp : Numpy function, optional (default `np.less`)
+        comp : NumPy function, optional (default `np.less`)
             Comparison function (`np.greater`, `np.less_equal`, etc.).
 
         Returns
@@ -617,18 +507,6 @@ class HEP(object):
             dist_y = np.linalg.norm(yarr - cref, axis=-1)
             result = comp(dist_x, dist_y)
         return result
-
-
-class Concatenation(object):
-    """Class for concatenation of HEP descriptors."""
-    def __init__(self, *descriptors):
-        self.descriptors = descriptors
-
-    def __call__(self, img):
-        return np.concatenate([d(img) for d in self.descriptors])
-
-    def __str__(self):
-        return '+'.join([d.__str__() for d in self.descriptors])
 
 
 class CompletedLocalBinaryCountSM(HEP):
@@ -1233,6 +1111,11 @@ class LocalConveXMicroStructurePatterns(MicroStructurePatterns):
 
 class LocalConcaveConvexMicroStructurePatterns(MicroStructurePatterns):
     """Return the local concave and convex micro-structure patterns.
+    
+    Attributes
+    ----------
+    components : list of HEP
+        Descriptors to be concatenated.
 
     Examples
     --------
@@ -1259,6 +1142,21 @@ class LocalConcaveConvexMicroStructurePatterns(MicroStructurePatterns):
     True
 
     """
+    def __init__(self, **kwargs):
+        """Initializer of the class
+        
+        Parameters
+        ----------
+        kwargs : dictionary
+            Parameters the descriptor depends on, such as `order`, 
+            `radius`, `bands`, etc.
+            
+        """
+        super().__init__(**kwargs)
+        self.components = [LocalConcaVeMicroStructurePatterns, 
+                           LocalConveXMicroStructurePatterns]
+
+        
     def compute_dims(self, points):
         """Compute the dimension of the histogram for each neighbourhood."""
         return [2*2**(p + 2) for p in self.points]
@@ -1279,11 +1177,11 @@ class LocalConcaveConvexMicroStructurePatterns(MicroStructurePatterns):
             
         """
         params = {k: v for k, v in self.__dict__.items()}
-        descr_concave = LocalConcaVeMicroStructurePatterns(**params)
-        descr_convex = LocalConveXMicroStructurePatterns(**params)
-        hist_concave = descr_concave(img)
-        hist_convex = descr_convex(img)
-        return np.concatenate([hist_concave, hist_convex])
+        histograms = []
+        for component in self.components:
+            descriptor = component(**params)
+            histograms.append(descriptor(img))
+        return np.concatenate(histograms)
 
 
 class LocalDirectionalRankCoding(HEP):

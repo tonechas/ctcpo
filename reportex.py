@@ -1,6 +1,9 @@
 #! /usr/bin/env python37
+"""
+This module includes all the necessary stuff to automatically generate the 
+LaTeX source code of the report with the results obtained from colour texture 
+classification through partial orders.
 
-"""!!!
 """
 
 
@@ -12,115 +15,39 @@ import hep
 import utils
 
 
-#==========
-# FUNCTIONS
-#==========
+#===========#
+# CONSTANTS #
+#===========#
 
-def generate_latex_old(args):
-    ''' !!! Missing docstring.'''
+dataset_ids = {'CBT': 'CBT', 
+               'ForestMacro': 'ForestMacro', 
+               'ForestMicro': 'ForestMicro', 
+               'Kather': 'Kather', 
+               'KTHTIPS2b': 'KTH2b', 
+               'KylbergSintorn': 'KylSin', 
+               'MondialMarmi20': 'Mond20', 
+               'NewBarkTex': 'NewBarkTex', 
+               'Outex13': 'Outex13', 
+               'PapSmear': 'PapSmear', 
+               'Parquet': 'Parquet', 
+               'PlantLeaves': 'PlantLeaves', 
+               'STex': 'STex', 
+               'VxCTSG': 'VxCTSG'}
 
-    def get_max_val(lst):
-        ''' !!! Missing docstring.'''
-        flattened = []
-        for item in lst:
-            if isinstance(item, (int, float)):
-                flattened.append(item)
-            elif isinstance(item, list):
-                flattened.extend(item)
-        return max(flattened) if flattened else None
+order_ids = {'linear': '', 
+             'product': 'prod', 
+             'lexicographic': 'lex', 
+             'alphamod': 'alpha', 
+             'bitmixing': 'mix', 
+             'refcolor': 'ref', 
+             'random': 'rand'}
 
-    # Load settings
-    dbtex, imdescr = args, args#load_settings(args, config.IMGS)
-
-    # `sects`: names of the used descriptors (sorted alphabetically)
-    sections = sorted(set(d.__class__.__name__ for d in imdescr))
-
-#    # !!! Refactoring required
-    for s in sections:
-        # `s`: section title (is a descriptor name)
-        code.append(r'\section*{{{0}}}'.format(s))
-        tups = [tuple(d.radius) for d in imdescr if d.__class__.__name__ == s]
-        # `rlst`: radii considered for descriptor `s`
-        rlst = [*map(list, sorted(set(tups), key=lambda x: (len(x), x)))]
-        # `osect`: orders considered for descriptor `s`
-        #osect = sorted(set(d.order for d in imdescr if d.__class__.__name__ == s), key=lambda x: len(x))
-        osect = hep._orders
-        for k, (clf, params) in enumerate(config.ESTIMATORS):
-            if k > 0:
-                code.append(r'\newpage')
-            code.append(r'\subsection*{{{0}}}'.format(clf.__name__))
-            code.append(r'\begin{{longtable}}{{ll{0}}}'.format('r'*len(osect)))
-            heading = r' & '.join([o.capitalize() for o in osect])
-            code.append(r'Dataset & Radius & {0} \\'.format(heading))
-            code.append(r'\hline')
-            for db in dbtex:
-                for i, r in enumerate(rlst):
-                    if i == 0:
-                        line = r'{0} & {1} '.format(db, r)
-                    else:
-                        line = r' & {0} '.format(r)
-                    vals = []
-                    for o in osect:
-                    #for o in hep._orders:
-                        # `same`: list of descriptors with the same name, radius and order
-                        same = [d for d in imdescr if d.__class__.__name__ == s and d.radius == r and d.order == o]
-                        if not same:
-                            #print('Not required:  {}--{}--{}--{}--{}'.format(db, s, r, o, clf.__name__))
-                            vals.append(None)
-                        elif len(same) == 1:
-                            result_path = utils.filepath(config.DATA, db, same[0], clf)
-                            if os.path.isfile(result_path):
-                                #print('Reading single:  ', result_path)
-                                result = utils.load_object(result_path)
-                                acc = 100*np.mean([ts for g, ts in result])
-                                vals.append(acc)
-                            else:
-                                print('Not found (single):  ', result_path)
-                                vals.append(None)
-                        else:
-                            accs = []
-                            for descr in same:
-                                result_path = utils.filepath(config.DATA, db, descr, clf)
-                                if os.path.isfile(result_path):
-                                    #print('Reading multiple:  ', result_path)
-                                    result = utils.load_object(result_path)
-                                    accs.append(100*np.mean([ts for g, ts in result]))
-                                else:
-                                    print('Not found (multi):  ', result_path)
-                            if not accs:
-                                vals.append(None)
-                            elif len(accs) == 1:
-                                vals.append(accs[0])
-                            elif len(accs) > 1:
-                                vals.append([np.min(accs), np.max(accs)])
-                    for v in vals:
-                        maxval = get_max_val(vals)
-                        if v is None:
-                            line += r'& '
-                        elif isinstance(v, (int, float)):
-                            if v == maxval:
-                                line += r'& \bfseries{{{0:.1f}}} '.format(v)
-                            else:
-                                line += r'& {0:.1f} '.format(v)
-                        elif isinstance(v, list):
-                            if v[1] == maxval:
-                                line += r'& \bfseries{{{0:.1f}--{1:.1f}}} '.format(v[0], v[1])
-                            else:
-                                line += r'& {0:.1f}--{1:.1f} '.format(v[0], v[1])
-                    line += r'\\'
-                    code.append(line)
-
-            code.append(r'\end{longtable}')
-
-        code.append(r'\newpage')
-    code.append(r'\end{document}')
-
-    latex_path = os.path.join(config.DATA, 'results.tex')
-    with open(latex_path, 'w') as fid:
-        fid.write('\n'.join(code))
-
+#===========#
+# FUNCTIONS #
+#===========#
 
 def beginning():
+    """Generate the preamble of the report"""
     code = [r"\documentclass{{article}}",
             r"",
             r"\usepackage[a4paper,margin=20mm]{geometry}",
@@ -138,7 +65,20 @@ def beginning():
     return '\n'.join(code)
 
 
-def itemize(items):
+def itemize_ttt(items):
+    """Generate a list of items in tele type (typewriter or monospace) font
+    
+    Parameters
+    ----------
+    items : list of str
+        List of items.
+    
+    Returns
+    -------
+    out : str
+        LaTeX source code of the itemize environment.
+        
+    """
     itemstr = '\n'.join([rf"  \item \texttt{{{item}}}" for item in items])
     out =  (r"\begin{itemize}"
             f"\n{itemstr}\n"
@@ -147,14 +87,21 @@ def itemize(items):
 
 
 def intro_args(args):
-    """Generate section with command line arguments"""
+    """Generate section with command line arguments
+    
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Command line arguments.
+    
+    """
     code = [r"\section*{Command line arguments: \texttt{args}}",
             "",
             r"\begin{itemize}",
             r"\item \texttt{dataset}",
-            itemize(sorted(args.dataset)),
+            itemize_ttt(sorted(args.dataset)),
             r"\item \texttt{descriptor}",
-            itemize(sorted(args.descriptor)),
+            itemize_ttt(sorted(args.descriptor)),
             rf"\item \texttt{{order = {args.order}}}",
             rf"\item \texttt{{radius = {args.radius}}}",
             rf"\item \texttt{{bands = {args.bands}}}",
@@ -181,7 +128,14 @@ def intro_config():
 
 
 def intro_dims(args):
-    """Generate section with table of descriptor dimensionalities"""
+    """Generate section with table of descriptor dimensionalities
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Command line arguments.
+    
+    """
     code = [r'\section*{Dimensionalities}',
             '',
             r'\begin{longtable}{llrr}',
@@ -203,6 +157,7 @@ def intro_dims(args):
 
 
 def intro_validation():
+    """Generate section thar describes the validation methods"""
     code = [r"\section*{Validation methods}",
             "",
             r"\subsection*{\texttt{StratifiedShuffleSplit}}",
@@ -226,98 +181,261 @@ def intro_validation():
     
     return '\n'.join(code)
 
-#        vals = []
-#        for o in osect:
-#        #for o in hep._orders:
-#            # `same`: list of descriptors with the same name, radius and order
-#            same = [d for d in imdescr if d.__class__.__name__ == s and d.radius == r and d.order == o]
-#            if not same:
-#                #print('Not required:  {}--{}--{}--{}--{}'.format(db, s, r, o, clf.__name__))
-#                vals.append(None)
-#            elif len(same) == 1:
-#                result_path = utils.filepath(config.DATA, db, same[0], clf)
-#                if os.path.isfile(result_path):
-#                    #print('Reading single:  ', result_path)
-#                    result = utils.load_object(result_path)
-#                    acc = 100*np.mean([ts for g, ts in result])
-#                    vals.append(acc)
-#                else:
-#                    print('Not found (single):  ', result_path)
-#                    vals.append(None)
-#            else:
-#                accs = []
-#                for descr in same:
-#                    result_path = utils.filepath(config.DATA, db, descr, clf)
-#                    if os.path.isfile(result_path):
-#                        #print('Reading multiple:  ', result_path)
-#                        result = utils.load_object(result_path)
-#                        accs.append(100*np.mean([ts for g, ts in result]))
-#                    else:
-#                        print('Not found (multi):  ', result_path)
-#                if not accs:
-#                    vals.append(None)
-#                elif len(accs) == 1:
-#                    vals.append(accs[0])
-#                elif len(accs) > 1:
-#                    vals.append([np.min(accs), np.max(accs)])
 
-def row():
-    return "*" #!!!
+def read_score(folder, dat_id, descr_id, clf_id):
+    """Read test scores from a file and compute the average value
+
+    Parameters
+    ----------
+    folder : string
+        Full path of the folder where data are saved.
+    dat_id : string
+        Short name of a dataset.
+    descr_id : string
+        Short name of a descriptor.
+    clf_id : string
+        Short name of a classifier.
+        
+    Returns
+    -------
+    ts_avg : float
+        Average of test scores.
+
+    """
+    result_path = utils.filepath(folder, dat_id, descr_id, clf_id)
+    if os.path.isfile(result_path):
+        result = utils.load_object(result_path)
+        test_scores = [ts for _, ts in result]
+        ts_avg = 100*np.mean(test_scores)
+        return ts_avg
+    else:
+        return None
 
 
-def multirow(dat, est, descr, args, config):
-    code = []
-    for i, rad in enumerate(args.radius):
-        first = dat if i == 0 else ''
-        code.append(f"{first} & {rad} {row()}")
-    return '\n'.join(code)
+def get_scores(descr, clf, dat, rad, order, args):
+    """Return the computed average test scores
+
+    Parameters
+    ----------
+    descr : string
+        Full name of a descriptor.
+    clf : string
+        Instance of a classifier.
+    dat : string
+        Full name of a dataset.
+    rad : list of int
+        Radii of the local neighbourhoods.
+    args : argparse.Namespace
+        Command line arguments.
+        
+    Returns
+    -------
+    rates : list of float
+        Average of test scores. 
+        - If data are not available, the list is empty. 
+        - If the descriptor does not depend on additional parameters 
+        the list contains a single value. 
+        - If the descriptor depends on additional parameters, each 
+        item on the list corresponds to a particular combination of 
+        the parameter values.
+        
+    Raises
+    ------
+    ValueError if the value of parameter `order` is invalid .
+
+    """
+    def append_score(rates, folder, dat_id, descr_id, clf_id):
+        rate = read_score(folder, dat_id, descr_id, clf_id)
+        if rate is not None:
+            rates.append(rate)
+    
+    dat_id = dataset_ids[dat]
+    clf_id = utils.all_caps(clf.__name__)
+    descr_short = utils.all_caps(descr)
+    order_id = order_ids[order]
+
+    rates = []
+    if order in ['linear', 'product']:
+        descr_id = f'{descr_short}{order_id}{rad}'.replace(' ', '')
+        append_score(rates, config.data, dat_id, descr_id, clf_id)
+
+    elif order in ['lexicographic', 'bitmixing']:
+        for bands in args.bands:
+            descr_id = f'{descr_short}{order_id}{bands}{rad}'.replace(' ', '')
+            append_score(rates, config.data, dat_id, descr_id, clf_id)
+
+    elif order in ['alphamod']:
+        for bands in args.bands:
+            for alpha in args.alpha:
+                descr_id = f'{descr_short}{order_id}{alpha}{bands}{rad}'
+                descr_id = descr_id.replace(' ', '')
+                append_score(rates, config.data, dat_id, descr_id, clf_id)
+
+    elif order in ['refcolor']:
+        for rgb in args.cref:
+            cref = ''.join([format(i, '02x') for i in rgb]).upper()
+            descr_id = f'{descr_short}{order_id}{cref}{rad}'.replace(' ', '')
+            append_score(rates, config.data, dat_id, descr_id, clf_id)
+
+    elif order in ['random']:
+        for seed in args.seed:
+            descr_id = f'{descr_short}{order_id}{seed}{rad}'.replace(' ', '')
+            append_score(rates, config.data, dat_id, descr_id, clf_id)
+
+    else:
+        raise ValueError('invalid order')
+
+    return rates
+
+
+def single_entry(value, highest, tol=1e-6):
+    """Content (LaTeX source code) of a cell with a single score
+    
+    Parameters
+    ----------
+    value : float
+        Average of test scores. If `value` is greater than or equal to 
+        `highest`, is displayed in bold font.
+    highest : float
+        Highest value of the row.
+    tol : float, optional (default 1e-6)
+        Tolerance value used in the comparison of floats.
+
+    """
+    if abs(value - highest) < tol:
+        return rf'\bfseries{{{value:.1f}}}'
+    else:
+        return rf'{value:.1f}'
+
+
+def multi_entry(lst, highest, tol=1e-6):
+    """Content (LaTeX source code) of a cell with a range of scores
+    
+    Parameters
+    ----------
+    lst : list of float
+        Range of test scores in a cell. If any of the values in the range 
+        is greater than or equal to `highest`, the whole range is displayed 
+        in bold font.
+    highest : float
+        Highest value of the row.
+    tol : float, optional (default 1e-6)
+        Tolerance value used in the comparison of floats.
+
+    """
+    maxcell = max(lst)
+    mincell = min(lst)
+    if abs(maxcell - mincell) < 1e-6:
+         return single_entry(maxcell, highest)
+    elif abs(maxcell - highest) < tol:
+        return rf'\bfseries{{{mincell:.1f}-{maxcell:.1f}}}'
+    else:
+        return rf'{mincell:.1f}-{maxcell:.1f}'
         
 
-def table(dat, est, args, config):
+def get_cell(scores, highest):
+    """Return the content (LaTeX code) of a single cell of a table
+    
+    Parameters
+    ----------
+    scores : list
+        Score values.
+    highest : float
+        Highest score of a row of a table.
+
+    """
+    if not scores:
+        return ''
+    elif len(scores) == 1:
+        return single_entry(scores[0], highest)
+    else:
+        return multi_entry(scores, highest)
+
+
+def get_row(descr, clf, dat, rad, args):
+    """Single row of a table"""
+    cells = [get_scores(descr, clf, dat, rad, order, args) 
+             for order in args.order]
+    return cells
+
+def row_not_empty(row):
+    """Return True if the row has som values in it"""
+    non_empty_cells = [cell for cell in row if cell]
+    return len(non_empty_cells) > 0
+
+def multirow(descr, clf, dat, args):
+    """Rows of a table corresponding to the same dataset"""
+    rows = {tuple(rad): get_row(descr, clf, dat, rad, args) 
+                        for rad in args.radius}
+    if not any(row_not_empty(row) for row in rows.items()):
+        # There are no scores for this radius
+        return ''
+    else:
+        # There are some scores for this radius
+        first_row = True
+        code = []
+        for rad in rows.keys():
+            if row_not_empty(rows[rad]):
+                highest = max([max(cell) for cell in rows[rad] if cell])
+                cells = [f'{get_cell(cell, highest)}' for cell in rows[rad]]
+                src_row = ' & '.join(cells)
+                if first_row:
+                    col_heading = dat
+                    first_row = False
+                else:
+                    col_heading = ''
+                code.append(f"{col_heading} & {list(rad)} & {src_row} \\\\")
+        return '\n'.join(code)
+
+
+def table(descr, clf, args):
+    """Generate a table with the results of a subsection"""
     code = [rf"\begin{{longtable}}{{ll{'r'*len(args.order)}}}",
             r"Dataset & Radius & "
             rf"{' & '.join([order.capitalize() for order in args.order])} \\",
             r"\hline"]
-    for descr in args.descriptor:
-        code.append(multirow(dat, est, descr, args, config))
+    for dat in sorted(args.dataset):
+        code.append(multirow(descr, clf, dat, args))
     code.append("\\end{longtable}\n")
     return '\n'.join(code)
 
 
-def subsection(dat, est, args, config):
-    clf, _ = est
+def subsection(descr, clf, args):
+    """Generate the LaTeX source code of a subsection of the report"""
     code = [rf"\subsection*{{{clf.__name__}}}",
-            table(dat, est, args, config),
+            table(descr, clf, args),
             r"\newpage",
             "",
             ""]
     return '\n'.join(code)
 
 
-def section(dat, args, config):
-    code = [rf"\section*{{{dat}}}"]
-    for est in config.estimators:
-        code.append(subsection(dat, est, args, config))
+def section(descr, args):
+    """Generate the LaTeX source code of a section of the report"""
+    code = [rf"\section*{{{descr}}}"]
+    for clf, _ in config.estimators:
+        code.append(subsection(descr, clf, args))
     return '\n'.join(code)
 
 
-def sections(args, config):
-    sects = [section(dat, args, config) for dat in sorted(args.dataset)]
+def sections(args):
+    """Iterate through the sections that make up the report"""
+    sects = [section(descr, args) for descr in sorted(args.descriptor)]
     return '\n'.join(sects)
 
 
 def generate_latex(args, config):
-    """Automatically generate LaTeX source code for report"""
-    print('\nGenerating LaTeX code...')
+    """Automatically generate LaTeX source code for the report"""
+    print('\nGenerating LaTeX code...\n')
         
     code = [beginning(),
             intro_args(args),
             intro_config(),
             intro_dims(args),
             intro_validation(),
-            sections(),
+            sections(args),
             r"\end{document}"]
     src = '\n'.join(code)
     print(src)
-    with open(os.path.join(config.data, 'report.tex'), 'w') as f:
+    with open(os.path.join(config.data, 'latex', 'report.tex'), 'w') as f:
         print(src, file=f)

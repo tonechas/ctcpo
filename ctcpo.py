@@ -199,7 +199,7 @@ def make_parser():
         nargs='+', 
         type=lambda s: [int(item) for item in s.split(',')], 
         default=[[1]], 
-        help='Radii of local neighbourhoods, comma-separated (default "1"))')
+        help='Radii of local neighbourhoods, comma-separated (default "[1]"))')
 
     parser.add_argument(
         '--bands', 
@@ -289,6 +289,7 @@ def gen_descriptors(args, maxdim=2**16):
             args.descriptor, args.radius, args.order):
         extra_keys = []
         params = {'radius': radius, 'order': order}
+
         if order in ('lexicographic', 'bitmixing'):
             extra_keys.append('bands')
         elif order == 'alphamod':
@@ -297,6 +298,7 @@ def gen_descriptors(args, maxdim=2**16):
             extra_keys.append('cref')
         elif order == 'random':
             extra_keys.append('seed')
+
         if not extra_keys:
             obj = instantiate_hep(descr, params)
             if obj.dim <= maxdim:
@@ -342,6 +344,7 @@ def apply_descriptor(dataset, descriptor, print_info=False):
     order = descriptor.order
     n_samples = len(dataset.images)
     n_features = descriptor.dim
+
     try:
         X = np.zeros(shape=(n_samples, n_features), dtype=np.float64)
         for index, image_path in enumerate(dataset.images):
@@ -380,11 +383,52 @@ def apply_descriptor(dataset, descriptor, print_info=False):
     return X
 
 
-def extract_features(data_folder, imgs_folder, args):
-    """"
-    extract_features(data_folder, imgs_folder, args)
+def concatenate_feats(data_folder, dataset, descriptor):
+    """Compute features through concatenation of texture models.
+
+    Parameters
+    ----------
+    data_folder : str
+        Full path of the folder where data are saved.
+    dataset : texdata.TextureDataset
+        Object that encapsulates data of a texture dataset.
+    descriptor : hep.HEP
+        Object that encapsulates data of a texture descriptor.
     
-    Compute texture features.
+    Returns
+    -------
+    X : array
+        Computed features. The number of rows is equal to the number of
+        samples and the number of columns is equal to the sum of the 
+        dimensionalities of the concatenated texture models. If an error 
+        occurs in the call to `apply_descriptor`, it returns `None`.
+
+    """
+    dat_id = dataset.acronym
+    params = {k: v for k, v in descriptor.__dict__.items()}
+    feats = []
+
+    for component in descriptor.components: 
+        descr = component(**params)
+        descr_id = descr.abbrev()
+        feat_path = utils.filepath(data_folder, dat_id, descr_id)
+        if os.path.isfile(feat_path):
+            X = utils.load_object(feat_path)
+        else:
+            X = apply_descriptor(dataset, descr)
+            if X is not None:
+                utils.save_object(X, feat_path)
+            else:
+                break
+        feats.append(X)
+    else:
+        X = np.concatenate(feats, axis=-1)
+
+    return X
+
+
+def extract_features(data_folder, imgs_folder, args):
+    """"Compute texture features.
     
     Check whether features have been already computed. If they haven't, 
     extract features from each dataset using each descriptor in
@@ -402,7 +446,6 @@ def extract_features(data_folder, imgs_folder, args):
         
     """
     utils.boxed_text('Extracting features...', symbol='*')
-    print(f'Setting up the datasets and descriptors...\n')
 
     for dat in gen_datasets(imgs_folder, args.dataset):
         dat_id = dat.acronym
@@ -412,24 +455,21 @@ def extract_features(data_folder, imgs_folder, args):
                 descr_rad.radius = [rad]
                 descr_rad_id = descr_rad.abbrev()
                 feat_path = utils.filepath(data_folder, dat_id, descr_rad_id)
-#                feat_path = utils.filepath(data_folder, dat_id, descr_rad_id, ext='npy')
                 if os.path.isfile(feat_path):
                     print(f'Found {dat_id}--{descr_rad_id}', flush=True)
                 else:
                     print(f'Computing {dat_id}--{descr_rad_id}', flush=True)
-                    X = apply_descriptor(dat, descr_rad)
+                    if hasattr(descr_rad, 'components'):
+                        X = concatenate_feats(data_folder, dat, descr_rad)
+                    else:
+                        X = apply_descriptor(dat, descr_rad)
                     if X is not None:
                         utils.save_object(X, feat_path)
-#                        np.save(feat_path, X)
                         del X
-    print()
 
 
 def get_features(folder, dataset, descriptor):
-    """
-    get_features(folder, dataset, descriptor)
-    
-    Return texture features for a single dataset and descriptor.
+    """Return texture features for a single dataset and descriptor.
 
     Parameters
     ----------
@@ -460,7 +500,11 @@ def get_features(folder, dataset, descriptor):
             X = utils.load_object(feat_path)
         else:
             print(f'Computing {dataset_id}--{descr_single_id}')
-            X = apply_descriptor(dataset, descr_single)
+
+            if hasattr(descr_single, 'components'):
+                X = concatenate_feats(folder, dataset, descr_single)
+            else:
+                X = apply_descriptor(dataset, descr_single)
             if X is not None:
                 utils.save_object(X, feat_path)
             else:
@@ -472,10 +516,7 @@ def get_features(folder, dataset, descriptor):
 
 
 def grid_search_cv(X, y, clf, param_grid, n_folds, test_size, random_state):
-    """
-    grid_search_cv(X, y, clf, param_grid, n_folds, test_size, random_state)
-    
-    Tune hyper-parameters through grid search an cross-validation.
+    """Tune hyper-parameters through grid search an cross-validation.
 
     Parameters
     ----------
@@ -533,11 +574,7 @@ def grid_search_cv(X, y, clf, param_grid, n_folds, test_size, random_state):
 
 def classify(data_folder, imgs_folder, args, estimators, test_size, n_tests, 
              n_folds, random_state):
-    '''
-    classify(data_folder, imgs_folder, args, estimators, test_size, n_tests, 
-             n_folds, random_state)
-    
-    Compute classification results.
+    '''Compute classification results.
     
     Check whether features have been already classified. If not,
     perform classification using each estimator for each dataset and
@@ -568,7 +605,6 @@ def classify(data_folder, imgs_folder, args, estimators, test_size, n_tests,
         
     '''
     utils.boxed_text('Classifying...', symbol='*')
-    print(f'Setting up the datasets, descriptors and classifiers...\n')
 
     for clf, param_grid in estimators:
         clf_id = ''.join(
@@ -580,6 +616,8 @@ def classify(data_folder, imgs_folder, args, estimators, test_size, n_tests,
                 result_path = utils.filepath(
                         data_folder, dat_id, descr_id, clf_id)
                 if os.path.isfile(result_path):
+                    print(f'Loading {dat_id}--{descr_id}--{clf_id}', 
+                          flush=True)
                     result = utils.load_object(result_path)
                 else:
                     X = get_features(data_folder, dat, descr)
@@ -609,34 +647,6 @@ def classify(data_folder, imgs_folder, args, estimators, test_size, n_tests,
                 print(f'Mean test score: {100*np.mean(test_scores):.2f}%\n')
 
 
-#def command_line_arguments(folder, datasets, descriptors, estimators=None):
-#    ''' !!! Missing docstring.'''
-#    lines = []
-#
-#    for dbase, descr in itertools.product(datasets, descriptors):
-#        for (clf, _) in estimators:
-#            if not (check_features(data, dbase, descr) \
-#                    and check_results(data, dbase, descr, clf)):
-#                task = '--action all --datasets {} '.format(dbase)
-#                task += '--descriptor {} '.format(
-#                    descr.__class__.__name__)
-#                task += '--order {} '.format(descr.order)
-#                task += '--radius {} '.format(
-#                    ' '.join([str(r) for r in descr.radius]))
-#                if descr.order in ('lexicographic', 'bitmixing'):
-#                    task += '--bands {} '.format(descr.bands)
-#                elif descr.order == 'alphamod':
-#                    task += '--alpha {} '.format(descr.alpha)
-#                elif descr.order == 'refcolor':
-#                    task += '--cref {} '.format(
-#                        ' '.join([str(i) for i in descr.cref]))
-#                elif descr.order == 'random':
-#                    task += '--seed {} '.format(descr.seed)
-#                lines.append(task)
-#                break
-#    return lines
-
-
 def job_script():
     print('Generating job script...\n')
 #    for dat, descr in itertools.product(datasets, descriptors):
@@ -658,68 +668,10 @@ def job_script():
                 except MemoryError:
                     print()#f'MemoryError: skipping {dat_id}--{descr_single_id}', flush=True)
     print()
-    
-#def job_script(folder, job_id, partition, datasets, descriptors, estimators=None)#data, loops):
-#    """
-#    !!!
-#    """
-#    for dat, descr in itertools.product(datasets, descriptors):
-#        dat_id = dat.acronym
-#        for rad in descr.radius:
-#            descr_single = copy.deepcopy(descr)
-#            descr_single.radius = [rad]
-#            descr_single_id = descr_single.abbrev()
-#            feat_args = [folder, dat_id, descr_single_id]
-#            if estimators is None:
-#                this_one = utils.filepath(*feat_args)
-#            else:
-#                for clf, _ in estimators:
-#                    res_args = feat_args + [clf.__name__]
-#                    this_one = utils.filepath(*res_args)
-#
-#
-#
-#    datasets, descriptors, estimators = loops
-#    utils.display_sequence(datasets, 'Datasets', symbol='-')
-#    utils.display_sequence(descriptors, 'Descriptors', symbol='-')
-#    utils.display_sequence(
-#        [est[0].__name__ for est in estimators], 'Classifiers', symbol='-')
-#
-#    utils.display_message('Creating arguments file and job script', symbol='*')
-#
-#    tasks = command_line_arguments(data, loops)
-#    count = len(tasks)
-#
-#    if count == 0:
-#        print('All tasks are already completed. Did not generate script.\n')
-#    else:
-#        args_file = 'args_{}.config'.format(job_id)
-#        save_args_file(args_file, tasks)
-#        job_file = 'job_{}.sh'.format(job_id)
-#        if partition == 'cola-corta':
-#            time_limit = '10:00:00'
-#            max_ntasks = 48
-#        elif partition == 'thinnodes':
-#            time_limit = '4-00:00:00'
-#            max_ntasks = 48
-#        elif partition == 'fatsandy':
-#            partition = 'fatsandy --qos shared'
-#            max_ntasks = 32
-#            time_limit = '4-04:00:00'
-#
-#        # Workaround to keep the number of nodes low
-#        if count > max_ntasks:
-#            count = max_ntasks
-#
-#        with open('job_template.sh', 'r') as fscript:
-#            script = fscript.read().format(
-#                jobname=job_id, partition=partition,
-#                maxtime=time_limit, ntasks=count)
-#        save_job_script(job_file, script)
-#    print('Generating job script...')
 
 
 def delete_one_file(path_args):
+    """Delete a single file"""
     fname = utils.filepath(*path_args)
     utils.attempt_to_delete_file(fname)
 
@@ -807,7 +759,6 @@ def confirm_deletion(outcome):
 
     '''
     utils.boxed_text('Deleting features...', symbol='*')
-#    print(f'Setting up the datasets and descriptors...\n')
 
     ans = input(f'Are you sure you want to delete {outcome}? (Y/[N]) ')
     print()
@@ -818,8 +769,6 @@ def confirm_deletion(outcome):
     else:
         print(f'No {outcome} deleted\n')
         return False
-
- 
 
 
 def display_arguments(args):
@@ -856,7 +805,6 @@ def display_arguments(args):
     print('Classifiers')
     for clf, _ in config.estimators:
         print(f"- {clf.__name__}")
-    print()
     
 
 def main():
@@ -885,7 +833,17 @@ if __name__ == '__main__':
     if len(sys.argv) == 1:
         # No command-line arguments, intended for running the program from IDE
         #testargs = ['@args_all.txt', '--action', 'j']
-        testargs = '--act efc --dataset VxCTSG --desc RankTransform --order product linear --radius 1,2'.split()
+        testargs = '--action c --dataset NewBarkTex --descriptor LocalConcaveConvexMicroStructurePatterns --radius 1 --order lexicographic --bands RGB'.split()
+#        testargs = ('--act efc '
+#                    '--dataset CBT NewBarkTex '
+#                    '--desc ImprovedCenterSymmetricLocalBinaryPattern '
+#                    'RankTransform LocalConcaVeMicroStructurePatterns ' 
+#                    '--order linear product lexicographic bitmixing alphamod refcolor random '
+#                    '--bands RGB RBG GRB BGR '
+#                    '--radius 1 2 3 1,2 '
+#                    '--cref 0,0,0 127,127,127 '
+#                    '--alpha 2 4 '
+#                    '--seed 0 1 2 3 4').split()
         fake_argv = [sys.argv[0]] + testargs
         with patch.object(sys, 'argv', fake_argv):
             args = parser.parse_args()

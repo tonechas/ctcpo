@@ -8,6 +8,29 @@ import traceback
 import pickle
 import numpy as np
 
+def all_caps(name):
+    """Shorten long identifiers
+    
+    Parameters
+    ----------
+    name : str
+        Identifier to be abbreviated
+    
+    Returns
+    -------
+    A string made up from the uppercase letters in `name`.
+    
+    
+    Examples
+    --------
+    >>> all_caps('all lower case')
+    ''
+    >>> all_caps('LocalDirectionalRankCoding')
+    'LDRC'
+    
+    """
+    return ''.join([letter for letter in name if letter.isupper()])
+
 def boxed_text(txt, symbol='#'):
     """Display a text enclosed on a rectangle whose lines are 
     made up of `symbol`.
@@ -22,19 +45,22 @@ def boxed_text(txt, symbol='#'):
     Examples
     --------
     >>> boxed_text('Hello')
+    <BLANKLINE>
     #########
     # Hello #
     #########
     <BLANKLINE>
     >>> boxed_text('HELLO', '*')
+    <BLANKLINE>
     *********
     * HELLO *
     *********
     <BLANKLINE>
+    
     """
     length = len(txt) + 4
     hline = symbol*length
-    print(hline)
+    print(f'\n{hline}')
     print(f'{symbol} {txt} {symbol}')
     print(hline)
     print()
@@ -78,7 +104,7 @@ def load_object(path):
         #with open(path, 'rb') as fid:
             obj = pickle.load(fid)
         return obj
-    except Exception as error:
+    except:
         traceback.print_exc()
 
 
@@ -107,7 +133,7 @@ def save_object(obj, path):
             np.save(path, obj)
         else:
             raise ValueError(f"Invalid extension: {ext}, use '.pkl' or '.npy'")
-    except Exception as error:
+    except:
         traceback.print_exc()
 
 
