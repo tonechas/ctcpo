@@ -38,6 +38,7 @@ import IPython
 import itertools
 import os
 import sys
+import platform
 import psutil
 import textwrap
 import traceback
@@ -182,12 +183,6 @@ def make_parser():
         help='Names of image descriptors')
 
     parser.add_argument(
-        '--jobname', 
-        type=str, 
-        default='nonamejob.sh',
-        help='Name of the job (default "nonamejob")')
-
-    parser.add_argument(
         '--order', 
         nargs='+', 
         type=str, 
@@ -233,8 +228,20 @@ def make_parser():
     parser.add_argument(
         '--partition', 
         type=str, 
-        default='thinnodes',
-        help='Partition of Finis Terrae-II cluster (default "thinnodes")')
+        default='cola-corta',
+        help='Partition of Finis Terrae-II cluster (default "cola-corta")')
+
+    parser.add_argument(
+        '--maxruntime', 
+        type=float, 
+        default=10,
+        help='Maximum execution time in hours (default "10")')
+
+    parser.add_argument(
+        '--jobname', 
+        type=str, 
+        default='nonamejob.sh',
+        help='Name of the job (default "nonamejob.sh")')
 
     return parser
 
@@ -647,29 +654,6 @@ def classify(data_folder, imgs_folder, args, estimators, test_size, n_tests,
                 print(f'Mean test score: {100*np.mean(test_scores):.2f}%\n')
 
 
-def job_script():
-    print('Generating job script...\n')
-#    for dat, descr in itertools.product(datasets, descriptors):
-    count = 0
-#    for dat in gen_datasets(config.imgs, args.dataset):
-#        dat_id = dat.acronym
-#        print(psutil.virtual_memory(), flush=True)
-    with open('putamierda.txt', 'w') as f:
-        for descr in gen_descriptors(args):
-            for rad in descr.radius:
-                try:
-                    descr_single = copy.deepcopy(descr)
-                    descr_single.radius = [rad]
-                    descr_single_id = descr_single.abbrev()
-                    count += 1
-    #                print(f'Computing {dat_id}--{descr_single_id}', flush=True)
-                    print(f'{count:3} --  {descr_single_id}', file=f)
-    #                    print(f'{psutil.virtual_memory()[3]/(1024**2):.1f}', flush=True)
-                except MemoryError:
-                    print()#f'MemoryError: skipping {dat_id}--{descr_single_id}', flush=True)
-    print()
-
-
 def delete_one_file(path_args):
     """Delete a single file"""
     fname = utils.filepath(*path_args)
@@ -807,33 +791,20 @@ def display_arguments(args):
         print(f"- {clf.__name__}")
     
 
-def main():
-    pass
-
-
-#%%============#
-# MAIN PROGRAM #
-#==============#
-if __name__ == '__main__':
-    
-    # Print welcome message
-    utils.boxed_text('COLOUR TEXTURE CLASSIFICATION THROUGH PARTIAL ORDERS')
-
-    # Initialize global variables
-    # `config` is a module or an instance of `Configuration`.
-    try:
-        import config
-    except ImportError:
-        print('config.py not found')
-        print('Using default configuration')
-        config = Configuration()
-    
-    # Parse command-line options and arguments
+def parse_arguments():
+    """Parse command-line options and arguments"""
     parser = make_parser()
     if len(sys.argv) == 1:
         # No command-line arguments, intended for running the program from IDE
-        #testargs = ['@args_all.txt', '--action', 'j']
-        testargs = '--action c --dataset NewBarkTex --descriptor LocalConcaveConvexMicroStructurePatterns --radius 1 --order lexicographic --bands RGB'.split()
+        testargs = ['@args_all.txt', 
+                    '--dataset', 'CBT', 
+                    '--descriptor', 'LocalDirectionalRankCoding', 
+                    '--action', 'j', 
+                    '--radius', '1', '2',
+                    '--order', 'linear', 'product', 'random',
+                    '--seed', '0', '1', '2',
+                    '--maxruntime', '2']
+        #testargs = '--action c --dataset NewBarkTex --descriptor LocalConcaveConvexMicroStructurePatterns --radius 1 --order lexicographic --bands RGB'.split()
 #        testargs = ('--act efc '
 #                    '--dataset CBT NewBarkTex '
 #                    '--desc ImprovedCenterSymmetricLocalBinaryPattern '
@@ -861,6 +832,131 @@ if __name__ == '__main__':
     # Abort execution if datasets or descriptors have not been passed in
     if not args.dataset or not args.descriptor:
         sys.exit('error: datasets or descriptors have not been passed in')
+    
+    return args
+
+
+def job_script(dataset, descriptor, maxruntime, count):
+    """
+    !!! Missing docstring
+    
+    """
+    if maxruntime < 0 or maxruntime > 100:
+        print('Error: MAXRUNTIME must be in the range [0, 100]')
+        sys.exit()
+    
+    partition = 'cola-corta' if maxruntime <= 10 else 'thin-shared '
+
+    days = int(maxruntime//24)
+    hours = int(maxruntime%24)
+    minutes = int((maxruntime - 24*days - hours)*60)
+
+    time = f'{hours:02}:{minutes}:00'
+    if days > 1:
+        time = f'{days}-{time}'
+    else:
+        time = f'{time}  '
+
+    jobname = f'job{count:05}'
+    
+    job = ['#!/bin/sh', 
+           '#SBATCH --mail-type=begin            # send email when the job begins',
+           '#SBATCH --mail-type=end              # send email when the job ends',
+           '#SBATCH --mail-user=antfdez@uvigo.es # e-mail address',
+           '#SBATCH --mem=24GB                   # allocated memory',
+           f'#SBATCH -p {partition}                # partition name',
+           f'#SBATCH -t {time}                 # maximum execution time',
+           f'#SBATCH -J {jobname}                  # name for the job']
+
+    srun = ['srun python /home/uvi/dg/afa/ctcpo/ctcpo.py',
+            '--action ef',
+            f'--dataset {dataset.__class__.__name__}',
+            f'--descriptor {descriptor.__class__.__name__}',
+            f'--radius {descriptor.radius[0]}',
+            f'--order {descriptor.order}']
+
+    if descriptor.order in ('lexicographic', 'bitmixing', 'alphamod'):
+        srun.append(f'--bands {descriptor.bands}')
+        if descriptor.order == 'alphamod':
+            srun.append(f'--alpha {descriptor.alpha}')
+    elif descriptor.order == 'refcolor':
+        cref = ','.join([format(i, '02x') for i in descriptor.cref]).upper()
+        srun.append(f'--cref {cref}')
+    elif descriptor.order == 'random':
+        srun.append(f'--seed {descriptor.seed}')
+
+    srun = ' '.join(srun)
+    job.append(srun)
+
+    script_fn = f'{jobname}.sh'
+    if platform.system() == 'Linux':
+        script_fn = os.path.join(
+                '/mnt/netapp2/Store_uni/home/uvi/dg/afa/texture/jobs',
+                script_fn)
+
+    with open(script_fn, 'w') as f:
+        print('\n'.join(job), file=f)
+    print('\n'.join(job))
+
+
+def generate_job_scripts(data_folder, imgs_folder, args):
+    """"Create job scripts.
+    
+    Check whether features have been already computed. If they haven't, 
+    create a job script for each dataset-descriptor pair.
+
+    Parameters
+    ----------
+    data_folder : string
+        Full path of the folder where data are saved.
+    imgs_folder : string
+        Full path of the folder where texture datasets are stored.
+    args : argparse.Namespace
+        Command line arguments.
+        
+    """
+    print('Generating job scripts...\n')
+
+    count = 0
+
+    for dat in gen_datasets(imgs_folder, args.dataset):
+        dat_id = dat.acronym
+        for descr in gen_descriptors(args):
+            for rad in descr.radius:
+                descr_rad = copy.deepcopy(descr)
+                descr_rad.radius = [rad]
+                descr_rad_id = descr_rad.abbrev()
+                feat_path = utils.filepath(data_folder, dat_id, descr_rad_id)
+
+                if not os.path.isfile(feat_path):
+                    count += 1
+                    print(f'job{count:05}.sh >> {dat_id}--{descr_rad_id}', 
+                          flush=True)
+                    job_script(dat, descr_rad, args.maxruntime, count)
+
+
+def main():
+    pass
+
+
+#%%============#
+# MAIN PROGRAM #
+#==============#
+if __name__ == '__main__':
+    
+    # Print welcome message
+    utils.boxed_text('COLOUR TEXTURE CLASSIFICATION THROUGH PARTIAL ORDERS')
+
+    # Initialize global variables
+    # `config` is a module or an instance of `Configuration`.
+    try:
+        import config
+    except ImportError:
+        print('config.py not found')
+        print('Using default configuration')
+        config = Configuration()
+        
+    args = parse_arguments()
         
     # Show settings
     display_arguments(args)
@@ -882,7 +978,7 @@ if __name__ == '__main__':
                  config.test_size, config.n_tests, 
                  config.n_folds, config.random_state)
     elif option == 'j':
-        job_script()
+        generate_job_scripts(config.data, config.imgs, args)
     elif option == 'l':
         reportex.generate_latex(args, config)
     elif option == 'df':
