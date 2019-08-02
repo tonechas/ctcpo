@@ -125,10 +125,7 @@ class MyArgumentParser(ArgumentParser):
 #===========#
 
 def make_parser():
-    """
-    make_parser()
-    
-    Return a parser for command-line options.
+    """Return a parser for command-line options.
 
     Returns
     -------
@@ -238,19 +235,16 @@ def make_parser():
         help='Maximum execution time in hours (default "10")')
 
     parser.add_argument(
-        '--jobname', 
+        '--jobprefix', 
         type=str, 
-        default='nonamejob.sh',
-        help='Name of the job (default "nonamejob.sh")')
+        default='job',
+        help='Prefix of the job ID (default "job")')
 
     return parser
 
 
 def gen_datasets(folder, dataset_names):
-    """
-    gen_datasets(folder, dataset_names)
-    
-    Generator for texture datasets.
+    """Generator for texture datasets.
 
     Parameters
     ----------
@@ -270,10 +264,7 @@ def gen_datasets(folder, dataset_names):
 
 
 def gen_descriptors(args, maxdim=2**16):
-    """
-    gen_descriptors(args, maxdim=2**16)
-    
-    Generator for texture descriptors.
+    """Generator for texture descriptors.
 
     Parameters
     ----------
@@ -321,10 +312,7 @@ def gen_descriptors(args, maxdim=2**16):
 
  
 def apply_descriptor(dataset, descriptor, print_info=False):
-    """
-    apply_descriptor(dataset, descriptor, print_info=False)
-    
-    Compute the features of the given dataset using the given descriptor.
+    """Compute the features of the given dataset using the given descriptor.
 
     Parameters
     ----------
@@ -655,7 +643,14 @@ def classify(data_folder, imgs_folder, args, estimators, test_size, n_tests,
 
 
 def delete_one_file(path_args):
-    """Delete a single file"""
+    """Delete a single file
+    
+    Parameters
+    ----------
+    path_args : sequence of str
+        Components that make up the full path of the file to be deleted.
+    
+    """
     fname = utils.filepath(*path_args)
     utils.attempt_to_delete_file(fname)
 
@@ -756,7 +751,14 @@ def confirm_deletion(outcome):
 
 
 def display_arguments(args):
-    """Print arguments on screen."""
+    """Print arguments on screen.
+
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Command line arguments.
+    
+    """
 
     def show_key_values(key, values):
         """Print pairs of argument name and list of values."""
@@ -771,7 +773,7 @@ def display_arguments(args):
     action = args.action.lower()
     print(f"Action:\n- {args.action}")
     if action in ('j', 'job'):
-        print(f"Job name:\n- {args.jobname}")
+        print(f"Job prefix:\n- {args.jobprefix}")
         print(f"Partition:\n- {args.partition}")
 
     for key in ('dataset', 'descriptor', 'order', 'radius'):
@@ -801,9 +803,10 @@ def parse_arguments():
                     '--descriptor', 'LocalDirectionalRankCoding', 
                     '--action', 'j', 
                     '--radius', '1', '2',
-                    '--order', 'linear', 'product', 'random',
-                    '--seed', '0', '1', '2',
-                    '--maxruntime', '2']
+                    '--order', 'product', 'random',
+                    '--seed', '0', '1', 
+                    '--maxruntime', '2', 
+                    '--jobprefix', 'MG-']
         #testargs = '--action c --dataset NewBarkTex --descriptor LocalConcaveConvexMicroStructurePatterns --radius 1 --order lexicographic --bands RGB'.split()
 #        testargs = ('--act efc '
 #                    '--dataset CBT NewBarkTex '
@@ -836,9 +839,26 @@ def parse_arguments():
     return args
 
 
-def job_script(dataset, descriptor, maxruntime, count):
+def job_script(dataset, descriptor, maxruntime, prefix, count):
     """
-    !!! Missing docstring
+    Save to disk a job script to be submitted to slurm
+    
+    Parameters
+    ----------
+    dataset : texdata.TextureDataset
+        Object that encapsulates data of a texture dataset.
+    descriptor : hep.HEP
+        Object that encapsulates data of a texture descriptor.
+    maxruntime : float
+        Maximum execution time expressed in hours.
+    prefix : str
+        Id of the batch os scripts.
+    count : int
+        Number of the script within a batch.
+    
+    Notes
+    -----
+    The script file name is <prefix><count>.sh
     
     """
     if maxruntime < 0 or maxruntime > 100:
@@ -851,22 +871,23 @@ def job_script(dataset, descriptor, maxruntime, count):
     hours = int(maxruntime%24)
     minutes = int((maxruntime - 24*days - hours)*60)
 
-    time = f'{hours:02}:{minutes}:00'
+    time = f'{hours:02}:{minutes:02}:00'
     if days > 1:
         time = f'{days}-{time}'
     else:
         time = f'{time}  '
 
-    jobname = f'job{count:05}'
+    jobname = f'{prefix[:3]}{count:05}.sh'
+    print(f'{jobname} >> {dataset.acronym}--{descriptor.abbrev()}', flush=True)
     
     job = ['#!/bin/sh', 
-           '#SBATCH --mail-type=begin            # send email when the job begins',
-           '#SBATCH --mail-type=end              # send email when the job ends',
+           '#SBATCH --mail-type=begin            # send email when job begins',
+           '#SBATCH --mail-type=end              # send email when job ends',
            '#SBATCH --mail-user=antfdez@uvigo.es # e-mail address',
            '#SBATCH --mem=24GB                   # allocated memory',
            f'#SBATCH -p {partition}                # partition name',
-           f'#SBATCH -t {time}                 # maximum execution time',
-           f'#SBATCH -J {jobname}                  # name for the job']
+           f'#SBATCH -t {time}                # maximum execution time',
+           f'#SBATCH -J {jobname}               # name for the job']
 
     srun = ['srun python /home/uvi/dg/afa/ctcpo/ctcpo.py',
             '--action ef',
@@ -888,15 +909,12 @@ def job_script(dataset, descriptor, maxruntime, count):
     srun = ' '.join(srun)
     job.append(srun)
 
-    script_fn = f'{jobname}.sh'
-    if platform.system() == 'Linux':
-        script_fn = os.path.join(
-                '/mnt/netapp2/Store_uni/home/uvi/dg/afa/texture/jobs',
-                script_fn)
+    script_fn = f'{jobname}'
+    #print('\n'.join(job))
+    #print()
 
     with open(script_fn, 'w') as f:
         print('\n'.join(job), file=f)
-    print('\n'.join(job))
 
 
 def generate_job_scripts(data_folder, imgs_folder, args):
@@ -930,9 +948,8 @@ def generate_job_scripts(data_folder, imgs_folder, args):
 
                 if not os.path.isfile(feat_path):
                     count += 1
-                    print(f'job{count:05}.sh >> {dat_id}--{descr_rad_id}', 
-                          flush=True)
-                    job_script(dat, descr_rad, args.maxruntime, count)
+                    job_script(dat, descr_rad, args.maxruntime, 
+                               args.jobprefix, count)
 
 
 def main():
@@ -970,13 +987,13 @@ if __name__ == '__main__':
         extract_features(config.data, config.imgs, args)
     elif option == 'c':
         classify(config.data, config.imgs, args, config.estimators, 
-                 config.test_size, config.n_tests, 
-                 config.n_folds, config.random_state)
+                 config.test_size, config.n_tests, config.n_folds, 
+                 config.random_state)
     elif option == 'efc':
         extract_features(config.data, config.imgs, args)
         classify(config.data, config.imgs, args, config.estimators, 
-                 config.test_size, config.n_tests, 
-                 config.n_folds, config.random_state)
+                 config.test_size, config.n_tests, config.n_folds, 
+                 config.random_state)
     elif option == 'j':
         generate_job_scripts(config.data, config.imgs, args)
     elif option == 'l':
@@ -986,11 +1003,13 @@ if __name__ == '__main__':
             delete_features(config.data, config.imgs, args)
     elif option == 'dr':
         if confirm_deletion('results'):
-            delete_results(config.data, config.imgs, args, config.estimators)
+            delete_results(config.data, config.imgs, args, 
+                           config.estimators)
     elif option == 'da':
         if confirm_deletion('features and results'):
             delete_features(config.data, config.imgs, args)
-            delete_results(config.data, config.imgs, args, config.estimators)
+            delete_results(config.data, config.imgs, args, 
+                           config.estimators)
     else:
         print(f"Argument \"--action {args.action}\" is not valid")
         print('Run:')

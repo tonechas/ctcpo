@@ -437,5 +437,5 @@ def generate_latex(args, config):
             r"\end{document}"]
     src = '\n'.join(code)
     print(src)
-    with open(os.path.join(config.data, 'latex', 'report.tex'), 'w') as f:
+    with open(os.path.join(config.home, 'latex', 'report.tex'), 'w') as f:
         print(src, file=f)
