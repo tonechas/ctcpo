@@ -1,4 +1,3 @@
 __pycache__/*
 *.out
 *.sh
-!submit.sh

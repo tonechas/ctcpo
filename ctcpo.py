@@ -38,7 +38,6 @@ import IPython
 import itertools
 import os
 import sys
-import platform
 import psutil
 import textwrap
 import traceback
@@ -225,8 +224,8 @@ def make_parser():
     parser.add_argument(
         '--partition', 
         type=str, 
-        default='cola-corta',
-        help='Partition of Finis Terrae-II cluster (default "cola-corta")')
+        default='thin-shared',
+        help='Partition of Finis Terrae II cluster (default "thin-shared")')
 
     parser.add_argument(
         '--maxruntime', 
@@ -239,6 +238,12 @@ def make_parser():
         type=str, 
         default='job',
         help='Prefix of the job ID (default "job")')
+
+    parser.add_argument(
+        '--qos', 
+        type=str, 
+        default='default',
+        help='Quality of services of Finis Terrae II (default "default")')
 
     return parser
 
@@ -805,8 +810,10 @@ def parse_arguments():
                     '--radius', '1', '2',
                     '--order', 'product', 'random',
                     '--seed', '0', '1', 
-                    '--maxruntime', '2', 
-                    '--jobprefix', 'MG-']
+                    '--maxruntime', '300', 
+                    '--jobprefix', 'MG-', 
+                    '--partition', 'shared', 
+                    '--qos', 'shared_long']
         #testargs = '--action c --dataset NewBarkTex --descriptor LocalConcaveConvexMicroStructurePatterns --radius 1 --order lexicographic --bands RGB'.split()
 #        testargs = ('--act efc '
 #                    '--dataset CBT NewBarkTex '
@@ -839,7 +846,34 @@ def parse_arguments():
     return args
 
 
-def job_script(dataset, descriptor, maxruntime, prefix, count):
+def check_slurm_settings(args):
+    """Check that job settings are valid
+    
+    Parameters
+    ----------
+    args : argparse.Namespace
+        Command line arguments.
+
+    Raises
+    ------
+    ValueError if slurm settings are inconsistent.
+    
+    """
+    err_msg = 'invalid maxruntime'
+    if args.maxruntime < 0:
+        raise ValueError('maxruntime has to be positive')
+    
+    if (args.partition in ('cola-corta', 'thin-shared')) and \
+       args.maxruntime > 100:
+        raise ValueError(err_msg)
+        
+    if args.partition == 'shared':
+        if (args.qos == 'shared' and args.maxruntime > 100) or \
+           (args.qos == 'shared_long' and args.maxruntime > 300): 
+            raise ValueError(err_msg)
+
+
+def job_script(dataset, descriptor, args, count):
     """
     Save to disk a job script to be submitted to slurm
     
@@ -849,10 +883,8 @@ def job_script(dataset, descriptor, maxruntime, prefix, count):
         Object that encapsulates data of a texture dataset.
     descriptor : hep.HEP
         Object that encapsulates data of a texture descriptor.
-    maxruntime : float
-        Maximum execution time expressed in hours.
-    prefix : str
-        Id of the batch os scripts.
+    args : argparse.Namespace
+        Command line arguments.
     count : int
         Number of the script within a batch.
     
@@ -860,13 +892,18 @@ def job_script(dataset, descriptor, maxruntime, prefix, count):
     -----
     The script file name is <prefix><count>.sh
     
-    """
-    if maxruntime < 0 or maxruntime > 100:
-        print('Error: MAXRUNTIME must be in the range [0, 100]')
+    """    
+    try:
+        check_slurm_settings(args)
+    except ValueError as ex:
+        print(ex)
         sys.exit()
-    
-    partition = 'cola-corta' if maxruntime <= 10 else 'thin-shared '
 
+    maxruntime = args.maxruntime
+    partition = args.partition
+    qos = args.qos
+    jobprefix = args.jobprefix
+        
     days = int(maxruntime//24)
     hours = int(maxruntime%24)
     minutes = int((maxruntime - 24*days - hours)*60)
@@ -875,19 +912,20 @@ def job_script(dataset, descriptor, maxruntime, prefix, count):
     if days > 1:
         time = f'{days}-{time}'
     else:
-        time = f'{time}  '
+        time = f'{time}'
 
-    jobname = f'{prefix[:3]}{count:05}.sh'
+    jobname = f'{jobprefix[:3]}{count:05}.sh'
     print(f'{jobname} >> {dataset.acronym}--{descriptor.abbrev()}', flush=True)
     
     job = ['#!/bin/sh', 
            '#SBATCH --mail-type=begin            # send email when job begins',
            '#SBATCH --mail-type=end              # send email when job ends',
            '#SBATCH --mail-user=antfdez@uvigo.es # e-mail address',
-           '#SBATCH --mem=24GB                   # allocated memory',
-           f'#SBATCH -p {partition}                # partition name',
-           f'#SBATCH -t {time}                # maximum execution time',
-           f'#SBATCH -J {jobname}               # name for the job']
+           '#SBATCH --mem-per-cpu=24GB           # allocated memory',
+           f'#SBATCH --qos {qos:<11}            # quality of services',
+           f'#SBATCH -p {partition:<11}               # partition name',
+           f'#SBATCH -t {time:<11}               # maximum execution time',
+           f'#SBATCH -J {jobname}               # job name']
 
     srun = ['srun python /home/uvi/dg/afa/ctcpo/ctcpo.py',
             '--action ef',
@@ -948,8 +986,7 @@ def generate_job_scripts(data_folder, imgs_folder, args):
 
                 if not os.path.isfile(feat_path):
                     count += 1
-                    job_script(dat, descr_rad, args.maxruntime, 
-                               args.jobprefix, count)
+                    job_script(dat, descr_rad, args, count)
 
 
 def main():
