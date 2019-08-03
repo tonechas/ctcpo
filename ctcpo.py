@@ -808,8 +808,9 @@ def parse_arguments():
                     '--descriptor', 'LocalDirectionalRankCoding', 
                     '--action', 'j', 
                     '--radius', '1', '2',
-                    '--order', 'product', 'random',
+                    '--order', 'random', 'refcolor',
                     '--seed', '0', '1', 
+                    '--cref', '127,127,127',
                     '--maxruntime', '300', 
                     '--jobprefix', 'MG-', 
                     '--partition', 'shared', 
@@ -914,7 +915,7 @@ def job_script(dataset, descriptor, args, count):
     else:
         time = f'{time}'
 
-    jobname = f'{jobprefix[:3]}{count:05}.sh'
+    jobname = f'{jobprefix[:3]}{count:05}'
     print(f'{jobname} >> {dataset.acronym}--{descriptor.abbrev()}', flush=True)
     
     job = ['#!/bin/sh', 
@@ -925,7 +926,7 @@ def job_script(dataset, descriptor, args, count):
            f'#SBATCH --qos {qos:<11}            # quality of services',
            f'#SBATCH -p {partition:<11}               # partition name',
            f'#SBATCH -t {time:<11}               # maximum execution time',
-           f'#SBATCH -J {jobname}               # job name']
+           f'#SBATCH -J {jobname}                  # job name']
 
     srun = ['srun python /home/uvi/dg/afa/ctcpo/ctcpo.py',
             '--action ef',
@@ -939,7 +940,8 @@ def job_script(dataset, descriptor, args, count):
         if descriptor.order == 'alphamod':
             srun.append(f'--alpha {descriptor.alpha}')
     elif descriptor.order == 'refcolor':
-        cref = ','.join([format(i, '02x') for i in descriptor.cref]).upper()
+#        cref = ','.join([format(i, '02x') for i in descriptor.cref]).upper()
+        cref = ','.join(str(intensity) for intensity in descriptor.cref)
         srun.append(f'--cref {cref}')
     elif descriptor.order == 'random':
         srun.append(f'--seed {descriptor.seed}')
@@ -947,7 +949,7 @@ def job_script(dataset, descriptor, args, count):
     srun = ' '.join(srun)
     job.append(srun)
 
-    script_fn = f'{jobname}'
+    script_fn = f'{jobname}.sh'
     #print('\n'.join(job))
     #print()
 
