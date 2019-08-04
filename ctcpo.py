@@ -923,9 +923,9 @@ def job_script(dataset, descriptor, args, count):
            '#SBATCH --mail-type=end              # send email when job ends',
            '#SBATCH --mail-user=antfdez@uvigo.es # e-mail address',
            '#SBATCH --mem-per-cpu=24GB           # allocated memory',
-           f'#SBATCH --qos {qos:<11}            # quality of services',
            f'#SBATCH -p {partition:<11}               # partition name',
            f'#SBATCH -t {time:<11}               # maximum execution time',
+           f'#SBATCH --qos {qos:<11}            # quality of services',
            f'#SBATCH -J {jobname}                  # job name']
 
     srun = ['srun python /home/uvi/dg/afa/ctcpo/ctcpo.py',
@@ -940,7 +940,6 @@ def job_script(dataset, descriptor, args, count):
         if descriptor.order == 'alphamod':
             srun.append(f'--alpha {descriptor.alpha}')
     elif descriptor.order == 'refcolor':
-#        cref = ','.join([format(i, '02x') for i in descriptor.cref]).upper()
         cref = ','.join(str(intensity) for intensity in descriptor.cref)
         srun.append(f'--cref {cref}')
     elif descriptor.order == 'random':
