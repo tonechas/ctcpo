@@ -31,7 +31,7 @@ RankTransform
 
 --order linear product lexicographic bitmixing alphamod refcolor random
 
---radius 1 2 3
+--radius 1 2 3 1,2 1,2,3
 
 --bands RGB RBG GRB GBR BRG BGR
 

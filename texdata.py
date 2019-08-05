@@ -58,9 +58,15 @@ class TextureDataset(object):
             Full path to the folder that contains the dataset. The name 
             of the last path component (i.e. the name of the folder that 
             contains the images) must match the class name.
-            
+        
+        Raises
+        ------
+        ValueError if the list of images is empty.
+        
         """
         self.images = find_images(dirpath)
+        if not self.images:
+            raise ValueError(f'{dirpath} not found or does not contain images')
         self.classes = {text: num for num, text in enumerate(sorted(
             set(self.get_class(img) for img in self.images)))}
         self.labels = np.asarray([self.get_label(img) for img in self.images])

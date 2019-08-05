@@ -48,10 +48,10 @@ import numpy as np
 from argparse import ArgumentParser, RawTextHelpFormatter
 from skimage import io, color
 from sklearn.model_selection import GridSearchCV
-from sklearn.neighbors import KNeighborsClassifier
-from unittest.mock import patch
 from sklearn.model_selection import StratifiedKFold
 from sklearn.model_selection import train_test_split
+from sklearn.neighbors import KNeighborsClassifier
+from unittest.mock import patch
 
 
 import texdata
@@ -803,19 +803,19 @@ def parse_arguments():
     parser = make_parser()
     if len(sys.argv) == 1:
         # No command-line arguments, intended for running the program from IDE
-        testargs = ['@args_all.txt', 
-                    '--dataset', 'CBT', 
-                    '--descriptor', 'LocalDirectionalRankCoding', 
-                    '--action', 'j', 
-                    '--radius', '1', '2',
-                    '--order', 'random', 'refcolor',
-                    '--seed', '0', '1', 
-                    '--cref', '127,127,127',
-                    '--maxruntime', '300', 
-                    '--jobprefix', 'MG-', 
-                    '--partition', 'shared', 
-                    '--qos', 'shared_long']
-        #testargs = '--action c --dataset NewBarkTex --descriptor LocalConcaveConvexMicroStructurePatterns --radius 1 --order lexicographic --bands RGB'.split()
+#        testargs = ['@args_all.txt', 
+#                    '--dataset', 'CBT', 
+#                    '--descriptor', 'LocalDirectionalRankCoding', 
+#                    '--action', 'j', 
+#                    '--radius', '1', '2',
+#                    '--order', 'random', 'refcolor',
+#                    '--seed', '0', '1', 
+#                    '--cref', '127,127,127',
+#                    '--maxruntime', '300', 
+#                    '--jobprefix', 'MG-', 
+#                    '--partition', 'shared', 
+#                    '--qos', 'shared_long']
+        testargs = '@args_all.txt --action ef --dataset VxCTSG --radius 1 2 3'.split()
 #        testargs = ('--act efc '
 #                    '--dataset CBT NewBarkTex '
 #                    '--desc ImprovedCenterSymmetricLocalBinaryPattern '
