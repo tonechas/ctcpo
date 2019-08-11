@@ -34,7 +34,7 @@ Examples
 #=========#
 
 import copy
-import IPython
+#import IPython
 import itertools
 import os
 import sys
@@ -1017,7 +1017,7 @@ if __name__ == '__main__':
     display_arguments(args)
     
     # Make sure data directory exists
-    IPython.utils.path.ensure_dir_exists(config.data)
+#    IPython.utils.path.ensure_dir_exists(config.data)
     
     # Execute the proper action
     option = args.action.lower()
