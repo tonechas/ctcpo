@@ -38,7 +38,7 @@ import copy
 import itertools
 import os
 import sys
-import psutil
+#import psutil
 import textwrap
 import traceback
 import warnings
@@ -375,7 +375,7 @@ def apply_descriptor(dataset, descriptor, print_info=False):
         error_id = ex.__class__.__name__
         print(f'{error_id}: skipping {dataset_id}--{descriptor_id}')
         if error_id == 'MemoryError':
-            print(psutil.virtual_memory(), flush=True)
+#            print(psutil.virtual_memory(), flush=True)
             traceback.print_exc()
             sys.stdout.flush()
         X = None
