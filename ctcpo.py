@@ -929,7 +929,7 @@ def job_script(dataset, descriptor, args, count):
            f'#SBATCH -J {jobname}                  # job name']
 
     srun = ['srun python /home/uvi/dg/afa/ctcpo/ctcpo.py',
-            '--action ef',
+            '--action c',
             f'--dataset {dataset.__class__.__name__}',
             f'--descriptor {descriptor.__class__.__name__}',
             f'--radius {descriptor.radius[0]}',
