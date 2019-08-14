@@ -32,9 +32,11 @@ from sklearn.svm import SVC
 
 
 if platform.system() == 'Linux':
-    home = r'/mnt/netapp2/Store_uni/home/uvi/dg/afa/texture'
+    home = '/mnt/netapp2/Store_uni/home/uvi/dg/afa/texture'
 elif platform.system() == 'Windows':
     home = r'C:\texture'
+elif platform.system() == 'Darwin':
+    home = '/Users/antoniofernandezalvarez/Dropbox/CESGA/home'
 
 
 imgs = os.path.join(home, 'images')

@@ -152,7 +152,7 @@ def make_parser():
     parser.add_argument(
         '--action', 
         type=str, 
-        choices = ('ef', 'c', 'efc', 'j', 'l', 'df', 'dr', 'da'), 
+        choices = ('ef', 'c', 'efc', 'jf', 'jr', 'l', 'df', 'dr', 'da'), 
         default='efc', 
         help=textwrap.dedent(
                 '''\
@@ -160,7 +160,8 @@ def make_parser():
                     ef    Extract features
                     c     Classify
                     efc   Extract features and classify
-                    j     Job (generate script)
+                    jf    Generate job script to compute features
+                    jr    Generate job script to compute results
                     l     Latex (generate LaTeX source code)
                     df    Delete features
                     dr    Delete results
@@ -574,7 +575,7 @@ def grid_search_cv(X, y, clf, param_grid, n_folds, test_size, random_state):
 
 def classify(data_folder, imgs_folder, args, estimators, test_size, n_tests, 
              n_folds, random_state):
-    '''Compute classification results.
+    """Compute classification results.
     
     Check whether features have been already classified. If not,
     perform classification using each estimator for each dataset and
@@ -603,7 +604,7 @@ def classify(data_folder, imgs_folder, args, estimators, test_size, n_tests,
         Seed for the random number generator. This affects the splits into 
         train and test, and the cross-validation folds.
         
-    '''
+    """
     utils.boxed_text('Classifying...', symbol='*')
 
     for clf, param_grid in estimators:
@@ -777,7 +778,7 @@ def display_arguments(args):
         print(f"Settings taken from:\n- {args.argsfile}")
     action = args.action.lower()
     print(f"Action:\n- {args.action}")
-    if action in ('j', 'job'):
+    if action in ('jf', 'jr'):
         print(f"Job prefix:\n- {args.jobprefix}")
         print(f"Partition:\n- {args.partition}")
 
@@ -803,19 +804,19 @@ def parse_arguments():
     parser = make_parser()
     if len(sys.argv) == 1:
         # No command-line arguments, intended for running the program from IDE
-#        testargs = ['@args_all.txt', 
-#                    '--dataset', 'CBT', 
-#                    '--descriptor', 'LocalDirectionalRankCoding', 
-#                    '--action', 'j', 
-#                    '--radius', '1', '2',
-#                    '--order', 'random', 'refcolor',
-#                    '--seed', '0', '1', 
-#                    '--cref', '127,127,127',
-#                    '--maxruntime', '300', 
-#                    '--jobprefix', 'MG-', 
-#                    '--partition', 'shared', 
-#                    '--qos', 'shared_long']
-        testargs = '@args_all.txt --action ef --dataset VxCTSG --radius 1 2 3'.split()
+        testargs = ['@args_all.txt', 
+                    '--dataset', 'CBT', 
+                    '--descriptor', 'LocalDirectionalRankCoding', 
+                    '--action', 'jr', 
+                    '--radius', '1,2',
+                    '--order', 'random', 'refcolor',
+                    '--seed', '0', '1', 
+                    '--cref', '127,127,127',
+                    '--maxruntime', '300', 
+                    '--jobprefix', 'A7-', 
+                    '--partition', 'shared', 
+                    '--qos', 'shared_long']
+#        testargs = '@args_all.txt --action ef --dataset VxCTSG --radius 1 2 3'.split()
 #        testargs = ('--act efc '
 #                    '--dataset CBT NewBarkTex '
 #                    '--desc ImprovedCenterSymmetricLocalBinaryPattern '
@@ -874,7 +875,7 @@ def check_slurm_settings(args):
             raise ValueError(err_msg)
 
 
-def job_script(dataset, descriptor, args, count):
+def job_script(dataset, descriptor, args, count, action):
     """
     Save to disk a job script to be submitted to slurm
     
@@ -888,6 +889,9 @@ def job_script(dataset, descriptor, args, count):
         Command line arguments.
     count : int
         Number of the script within a batch.
+    action : str
+        Type of script to be generated: 'ef' for feature extraction or 'c' 
+        for classification results.
     
     Notes
     -----
@@ -929,7 +933,7 @@ def job_script(dataset, descriptor, args, count):
            f'#SBATCH -J {jobname}                  # job name']
 
     srun = ['srun python /home/uvi/dg/afa/ctcpo/ctcpo.py',
-            '--action c',
+            f'--action {action}',
             f'--dataset {dataset.__class__.__name__}',
             f'--descriptor {descriptor.__class__.__name__}',
             f'--radius {descriptor.radius[0]}',
@@ -956,8 +960,8 @@ def job_script(dataset, descriptor, args, count):
         print('\n'.join(job), file=f)
 
 
-def generate_job_scripts(data_folder, imgs_folder, args):
-    """"Create job scripts.
+def job_scripts_features(data_folder, imgs_folder, args):
+    """"Create job scripts for feature extraction.
     
     Check whether features have been already computed. If they haven't, 
     create a job script for each dataset-descriptor pair.
@@ -972,7 +976,7 @@ def generate_job_scripts(data_folder, imgs_folder, args):
         Command line arguments.
         
     """
-    print('Generating job scripts...\n')
+    print('Generating scripts for feature extraction...\n')
 
     count = 0
 
@@ -983,11 +987,49 @@ def generate_job_scripts(data_folder, imgs_folder, args):
                 descr_rad = copy.deepcopy(descr)
                 descr_rad.radius = [rad]
                 descr_rad_id = descr_rad.abbrev()
-                feat_path = utils.filepath(data_folder, dat_id, descr_rad_id)
-
-                if not os.path.isfile(feat_path):
+                
+                feats_path = utils.filepath(data_folder, dat_id, descr_rad_id)    
+                if not os.path.isfile(feats_path):
                     count += 1
-                    job_script(dat, descr_rad, args, count)
+                    job_script(dat, descr_rad, args, count, action='ef')
+ 
+
+def job_scripts_results(data_folder, imgs_folder, args, estimators):
+    """"Create job scripts to compute classification results.
+    
+    Check whether results have been already computed. If they haven't, 
+    create a job script for each dataset-descriptor pair.
+
+    Parameters
+    ----------
+    data_folder : string
+        Full path of the folder where data are saved.
+    imgs_folder : string
+        Full path of the folder where texture datasets are stored.
+    args : argparse.Namespace
+        Command line arguments.
+    estimators : list of tuples
+        Each tuple consist in a classifier (such as nearest neighbour,
+        support vector machine, etc.) and the parameters used for
+        optimization through `GridSearch`.
+        
+    """
+    print('Generating job scripts for classification...\n')
+
+    count = 0
+
+    for clf, param_grid in estimators:
+        clf_id = ''.join(
+                [letter for letter in clf.__name__ if letter.isupper()])
+        for dat in gen_datasets(imgs_folder, args.dataset):
+            dat_id = dat.acronym
+            for descr in gen_descriptors(args):
+                descr_id = descr.abbrev()                
+                result_path = utils.filepath(
+                        data_folder, dat_id, descr_id, clf_id)
+                if not os.path.isfile(result_path):
+                    count += 1
+                    job_script(dat, descr, args, count, action='c')
 
 
 def main():
@@ -1032,8 +1074,10 @@ if __name__ == '__main__':
         classify(config.data, config.imgs, args, config.estimators, 
                  config.test_size, config.n_tests, config.n_folds, 
                  config.random_state)
-    elif option == 'j':
-        generate_job_scripts(config.data, config.imgs, args)
+    elif option == 'jf':
+        job_scripts_features(config.data, config.imgs, args)
+    elif option == 'jr':
+        job_scripts_results(config.data, config.imgs, args, config.estimators)
     elif option == 'l':
         reportex.generate_latex(args, config)
     elif option == 'df':
