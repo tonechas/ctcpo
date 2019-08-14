@@ -805,15 +805,12 @@ def parse_arguments():
     if len(sys.argv) == 1:
         # No command-line arguments, intended for running the program from IDE
         testargs = ['@args_all.txt', 
-                    '--dataset', 'CBT', 
-                    '--descriptor', 'LocalDirectionalRankCoding', 
+                    '--dataset', 'STex', 
+                    #'--descriptor', 'LocalDirectionalRankCoding', 
                     '--action', 'jr', 
                     '--radius', '1,2',
-                    '--order', 'random', 'refcolor',
-                    '--seed', '0', '1', 
-                    '--cref', '127,127,127',
                     '--maxruntime', '300', 
-                    '--jobprefix', 'A7-', 
+                    '--jobprefix', 'kk-', 
                     '--partition', 'shared', 
                     '--qos', 'shared_long']
 #        testargs = '@args_all.txt --action ef --dataset VxCTSG --radius 1 2 3'.split()
