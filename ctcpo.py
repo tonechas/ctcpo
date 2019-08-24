@@ -929,7 +929,7 @@ def job_script(dataset, descriptor, args, count, action):
            f'#SBATCH --qos {qos:<11}            # quality of services',
            f'#SBATCH -J {jobname}                  # job name']
            
-    radii = ','.join(descriptor.radius)
+    radii = ','.join(map(str, descriptor.radius))
     srun = ['srun python /home/uvi/dg/afa/ctcpo/ctcpo.py',
             f'--action {action}',
             f'--dataset {dataset.__class__.__name__}',
