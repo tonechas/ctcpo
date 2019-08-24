@@ -225,14 +225,14 @@ def make_parser():
     parser.add_argument(
         '--partition', 
         type=str, 
-        default='thin-shared',
-        help='Partition of Finis Terrae II cluster (default "thin-shared")')
+        default='shared',
+        help='Partition of Finis Terrae II cluster (default "shared")')
 
     parser.add_argument(
         '--maxruntime', 
         type=float, 
-        default=10,
-        help='Maximum execution time in hours (default "10")')
+        default=100,
+        help='Maximum execution time in hours (default "100")')
 
     parser.add_argument(
         '--jobprefix', 
@@ -243,8 +243,8 @@ def make_parser():
     parser.add_argument(
         '--qos', 
         type=str, 
-        default='default',
-        help='Quality of services of Finis Terrae II (default "default")')
+        default='shared',
+        help='Quality of services of Finis Terrae II (default "shared")')
 
     return parser
 
@@ -923,17 +923,18 @@ def job_script(dataset, descriptor, args, count, action):
            '#SBATCH --mail-type=begin            # send email when job begins',
            '#SBATCH --mail-type=end              # send email when job ends',
            '#SBATCH --mail-user=antfdez@uvigo.es # e-mail address',
-           '#SBATCH --mem-per-cpu=24GB           # allocated memory',
+           '#SBATCH --mem-per-cpu=25GB           # allocated memory',
            f'#SBATCH -p {partition:<11}               # partition name',
            f'#SBATCH -t {time:<11}               # maximum execution time',
            f'#SBATCH --qos {qos:<11}            # quality of services',
            f'#SBATCH -J {jobname}                  # job name']
-
+           
+    radii = ','.join(descriptor.radius)
     srun = ['srun python /home/uvi/dg/afa/ctcpo/ctcpo.py',
             f'--action {action}',
             f'--dataset {dataset.__class__.__name__}',
             f'--descriptor {descriptor.__class__.__name__}',
-            f'--radius {descriptor.radius[0]}',
+            f'--radius {radii}',
             f'--order {descriptor.order}']
 
     if descriptor.order in ('lexicographic', 'bitmixing', 'alphamod'):
