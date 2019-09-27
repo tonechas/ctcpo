@@ -157,7 +157,7 @@ def intro_dims(args):
 
 
 def intro_validation():
-    """Generate section thar describes the validation methods"""
+    """Generate section that describes the validation methods"""
     code = [r"\section*{Validation methods}",
             "",
             r"\subsection*{\texttt{StratifiedShuffleSplit}}",
