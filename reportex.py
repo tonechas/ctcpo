@@ -403,7 +403,9 @@ def table(descr, clf, args):
 def subsection(descr, clf, args):
     """Generate the LaTeX source code of a subsection of the report"""
     code = [rf"\subsection*{{{clf.__name__}}}",
+            rf"\small",
             table(descr, clf, args),
+            rf"\normalsize",
             r"\newpage",
             "",
             ""]

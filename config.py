@@ -45,7 +45,7 @@ log = os.path.join(home, 'log')
 
 
 estimators = [
-#    (KNeighborsClassifier, dict(n_neighbors=[1, 3, 5, 7, 9, 11])),
+    (KNeighborsClassifier, dict(n_neighbors=[1, 3, 5, 7, 9, 11])),
     (SVC, dict(C=np.logspace(-3, 2, 6), gamma=np.logspace(-3, 2, 6))),
     ]
 
